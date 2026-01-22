@@ -1,0 +1,19 @@
+{
+  "name": "shadowpulse",
+  "version": "1.0.0",
+  "main": "gettoken.js",
+  "scripts": {
+    "start": "node src/sensors/pulse.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.91.0",
+    "dotenv": "^17.2.3",
+    "open": "^11.0.0",
+    "spotify-web-api-node": "^5.0.2"
+  }
+}
