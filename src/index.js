@@ -1,51 +1,55 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const path = require('path');
+const envPath = path.resolve(__dirname, '../.env');
+require('dotenv').config({ path: envPath });
+
+console.log('[DEBUG] Loading .env from:', envPath);
+console.log('[DEBUG] Loaded PORT:', process.env.PORT);
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 const { startPulseSensor } = require('./sensors/pulse');
+const { startLimbicSensor } = require('./sensors/limbic');
+
+// --- CONSOLE INTERCEPTION ---
+global.logBuffer = [];
+const originalLog = console.log;
+console.log = function(...args) {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
+    const message = args.map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : arg)).join(' ');
+    
+    // Store in buffer (Max 50)
+    global.logBuffer.unshift({ timestamp, message });
+    if (global.logBuffer.length > 50) global.logBuffer.pop();
+
+    // Call original
+    originalLog.apply(console, args);
+};
+
+const cors = require('cors'); // Enable CORS for Frontend access
+const apiRoutes = require('./api/routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SHADOW_SECRET = process.env.SHADOW_SECRET;
 
-// Setup Database
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Middleware
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*'
+}));
+app.use(bodyParser.json());
 
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ extended: true })); // Required for Traccar Client
-
-// --- DEBUG LOGGER ---
-app.use((req, res, next) => {
-    // Don't log the root health check to avoid spam
-    if (req.path !== '/') {
-        console.log(`[REQUEST] ${req.method} ${req.path}`);
-    }
-    next();
-});
-
-const vitalRouter = require('./sensors/vital');
-const gpsRouter = require('./sensors/gps');
-
-// --- ROUTES ---
-
-// 1. Health Check (Render needs this to pass)
-app.get('/', (req, res) => {
-    res.send('Shadow Brain Stem: ONLINE');
-});
-
-// 2. Health Sensor Webhook (Vitals)
-app.use('/api/health', vitalRouter);
-
-// 3. GPS Sensor (Traccar)
-app.use('/api/gps', gpsRouter);
+// API Routes
+app.use('/api', apiRoutes);
 
 // --- IGNITION ---
 
 app.listen(PORT, () => {
     console.log(`[SYSTEM] Brain Stem Listening on Port ${PORT}`);
     
-    console.log("--- SHADOW VITAL ONLINE ---");
+    console.log("♡♡♡ SHADOW VITAL ONLINE ♡♡♡");
+    console.log("⊙⊙⊙ SHADOW COMPASS ONLINE ⊙⊙⊙");
+    console.log("⌁⌁⌁ SHADOW CORTEX ONLINE ⌁⌁⌁");
 
     // Start Background Sensors
     startPulseSensor();
+    startLimbicSensor();
 });

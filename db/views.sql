@@ -105,7 +105,7 @@ SELECT
 FROM view_health_metrics
 GROUP BY 1, 2;
 
--- 7. LOCATION HISTORY (Traccar)
+-- 7. LOCATION HISTORY (Compass / Traccar)
 -- Output: | timestamp | lat | lon | speed | battery | device |
 CREATE OR REPLACE VIEW view_location_history AS
 SELECT 
@@ -117,4 +117,31 @@ SELECT
     source as device_id
 FROM shadow_events
 WHERE event_type = 'location'
+ORDER BY timestamp DESC;
+
+-- 8. WORK HISTORY (Cortex / GitHub)
+-- Output: | timestamp | repo | branch | commits | files_changed | user |
+CREATE OR REPLACE VIEW view_work_history AS
+SELECT 
+    timestamp,
+    data->>'repo' as repo,
+    data->>'branch' as branch,
+    (data->>'commit_count')::int as commits,
+    ((data->>'files_added')::int + (data->>'files_removed')::int + (data->>'files_modified')::int) as total_files_changed,
+    source as user_handle
+FROM shadow_events
+WHERE event_type = 'code_push'
+ORDER BY timestamp DESC;
+
+-- 9. GAME HISTORY (Limbic / Steam)
+-- Output: | timestamp | status | game |
+CREATE OR REPLACE VIEW view_game_history AS
+SELECT 
+    timestamp,
+    data->>'status' as status,
+    data->>'game' as game,
+    source,
+    data->>'steam_id' as steam_id
+FROM shadow_events
+WHERE event_type = 'game_activity'
 ORDER BY timestamp DESC;

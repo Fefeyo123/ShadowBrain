@@ -15,23 +15,33 @@ router.all('/', async (req, res) => {
         let data = Object.keys(req.query).length > 0 ? req.query : req.body;
         
         // SUPPORT: Nested JSON format (Traccar Client specific?)
-        // Payload: { location: { coords: { latitude, longitude, ... } }, ... }
+        // Payload: { location: { coords: { latitude, longitude, ... }, batteryLevel: 0.95, extras: {} }, ... }
         if (data.location && data.location.coords) {
             const coords = data.location.coords;
+            // Traccar iOS often puts 'batteryLevel' (0.0-1.0) in the root of 'location' object, not 'coords'
+            const rawBatt = data.location.batteryLevel 
+                         || data.batteryLevel 
+                         || (data.location.extras ? data.location.extras.batteryLevel : 0);
+
             data = {
                 lat: coords.latitude,
                 lon: coords.longitude,
                 speed: coords.speed,
                 altitude: coords.altitude,
                 accuracy: coords.accuracy,
-                batt: data.batteryLevel || 0, // Sometimes at root or extras
-                id: data.id || 'iPhone_Manual_Sync' // Fallback
+                batt: (rawBatt * 100) || 0, // Convert 0.55 -> 55% if needed, or keep as is? specialized Traccar is usually 0-100.
+                // Wait, iOS native API is 0.0-1.0. Traccar usually sends 0-100?
+                // Let's assume if < 1 it's a decimal.
+                id: data.id || 'iPhone_Manual_Sync' 
             };
+            
+            // Auto-fix decimal battery
+            if (data.batt > 0 && data.batt <= 1) data.batt = data.batt * 100;
         }
 
         // 2. Validation
         if (!data.lat || !data.lon) {
-            console.warn(`[GPS] Invalid Payload. Data received:`, JSON.stringify(req.body));
+            console.warn(`[COMPASS] Invalid Payload. Data received:`, JSON.stringify(req.body));
             return res.status(400).send('Missing lat/lon');
         }
 
@@ -63,7 +73,7 @@ router.all('/', async (req, res) => {
 
         if (error) throw error;
 
-        console.log(`[GPS] Location stored: ${data.lat}, ${data.lon} (Dev: ${deviceId})`);
+        console.log(`⊙ [COMPASS] Location stored: ${data.lat}, ${data.lon} (Dev: ${deviceId})`);
         res.status(200).send('OK');
 
     } catch (err) {

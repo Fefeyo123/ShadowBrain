@@ -9,7 +9,7 @@ router.post('/', async (req, res) => {
     try {
         const secret = req.headers['x-shadow-secret'];
         if (secret !== SHADOW_SECRET) {
-            console.warn(`[VITAL] ${new Date().toLocaleTimeString()} | !! Unauthorized Access Attempt`);
+            console.warn(`♡ [VITAL] ${new Date().toLocaleTimeString()} | !! Unauthorized Access Attempt`);
             return res.status(403).json({ error: 'Forbidden' });
         }
 
@@ -79,7 +79,7 @@ router.post('/', async (req, res) => {
                     // Update the metric object with the FULL merged dataset
                     metric.data = mergedData;
 
-                    console.log(`[VITAL] Updating Sleep Timeline (ID: ${matchId}) - Merged ${newDataPoints.length} segments. Total: ${mergedData.length}.`);
+                    console.log(`♡ [VITAL] Updating Sleep Timeline (ID: ${matchId}) - Merged ${newDataPoints.length} segments. Total: ${mergedData.length}.`);
                     
                     await supabase
                         .from('shadow_events')
@@ -179,7 +179,7 @@ router.post('/', async (req, res) => {
         }).filter(Boolean);
 
         if (updates.length > 0) {
-            console.log(`[VITAL] ${new Date().toLocaleTimeString()} | >> Received & Saved:`);
+            console.log(`♡ [VITAL] ${new Date().toLocaleTimeString()} | >> Received & Saved:`);
             updates.forEach(update => {
                 console.log(`         • ${update}`);
             });

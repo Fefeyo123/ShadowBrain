@@ -1,0 +1,93 @@
+# The Shadow: Project Master Plan
+
+> "The Shadow requires serious engineering to build the 'eyes and ears' (the data vacuum), but the result is a beautiful, high-utility 'War Room' that feels alive."
+
+This document outlines the architecture for **ShadowPulse**, a bio-digital neural network that tracks, analyzes, and interrogates the user's life.
+
+---
+
+## Phase 1: The Architecture (The Nervous System)
+**Goal:** Ingest data from multiple sources in real-time, normalize it, and store it for the AI.
+
+*   **Backend:** Node.js (Express) on Render.
+    *   *Role:* Async API handling, Webhook Listeners, Polling Cron Jobs.
+*   **Database:** Supabase (PostgreSQL).
+    *   *Schema:* Single Table Event Sourcing (`shadow_events`) + SQL Views for Analysis.
+*   **AI Brain:** OpenAI (GPT-4o) via API.
+    *   *Role:* Pattern recognition, Interrogation logic.
+*   **Frontend:** Next.js (React).
+    *   *Aesthetic:* "Data Brutalism" / War Room Dashboard.
+
+---
+
+## Phase 2: The Senses (Data Inputs)
+We continuously ingest the "Holy Trinity" of student/dev life: **Code, Vibe, and Time.**
+
+### 1. The "Work" Sense (Code)
+*   **Source:** GitHub / VS Code.
+*   **Mechanism:** Webhook Listener.
+*   **Metrics:** Pushes, Commit Size, Time of Day.
+*   **Logic:** Detecting irregular intensity (e.g., 500 lines committed at 3 AM = High Intensity).
+
+### 2. The "Mood" Sense (Vibe) (ALREADY ACTIVE)
+*   **Source:** Spotify.
+*   **Mechanism:** Polling (Pulse Sensor).
+*   **Metrics:** BPM, Valence (Happiness), Energy, Genre.
+*   **Logic:**
+    *   High BPM + Low Valence = Stress/Aggression.
+    *   Low BPM + High Valence = Chilling.
+
+### 3. The "Vital" Sense (Biology) (ALREADY ACTIVE)
+*   **Source:** Apple Health / Watch.
+*   **Mechanism:** Push Webhook (Health Auto Export).
+*   **Metrics:** Heart Rate, Steps, Sleep Analysis (REM/Deep), Energy Burned.
+*   **Logic:** Correlating physical stress (High HR) with digital stress.
+
+### 4. The "Duty" Sense (Time)
+*   **Source:** Google Calendar / iCal.
+*   **Mechanism:** Read-Only API polling.
+*   **Logic:** Context injection. "User is skipping a class to code" vs "User is free."
+
+### 5. The "Location" Sense (World) (ALREADY ACTIVE)
+*   **Source:** Traccar (GPS).
+*   **Mechanism:** Push Webhook (OsmAnd Protocol).
+*   **Metrics:** Lat/Lon, Speed, Battery.
+*   **Logic:** Context of "Home" vs "Library" vs "Transit."
+
+---
+
+## Phase 3: The Brain (The Analysis Loop)
+The AI does not watch every second. It observes **Epochs**.
+
+*   **Routine:** "The Cron Job" runs every 30-60 minutes.
+*   **Process:**
+    1.  **Fetch:** Grab last hour of `shadow_events` (Music, Code, Health, Location).
+    2.  **Summarize:** Compress data into a context prompt.
+        > "User Context 14:00-15:00: Listening to 'Lo-fi Beats' (Low Energy). Wrote 0 lines of code. Heart Rate 60bpm. Location: Home."
+    3.  **Evaluate:** Compare against "Baseline."
+    4.  **Decision:**
+        *   *Normal:* Log "Status: Nominal."
+        *   *Abnormal:* Trigger **Interrogation**.
+
+---
+
+## Phase 4: The Interrogation (The Interface)
+When the AI detects a drift, it breaks the "Fourth Wall."
+
+*   **UI:** A modal takeover. Red pulse.
+*   **Message:** Direct, analytical confrontation.
+    > "Productivity drop detected. State: Drifting. Audio: Passive. Output: Zero. What is the blocker?"
+*   **Input:** User replies via text box.
+*   **Learning:** The AI tags this state. If user says "Reading Docs," the AI learns that "Low Code + Lo-Fi" = "Research Mode," not "Lazy."
+
+---
+
+## Aesthetic Vision: "Data Brutalism"
+The War Room is not a consumer app. It is a Lab.
+
+*   **Palette:** High Contrast Dark Mode. Black/Green/Red.
+*   **Typography:** Monospace (JetBrains Mono / IBM Plex Mono).
+*   **Components:**
+    *   **The Stream:** Raw log waterfall (Matrix style) on the left.
+    *   **The Map:** D3.js / React Flow graph in the center. Nodes represent "Era" or "Focus."
+    *   **The Pulse:** Live graphs (Heart Rate, Music).
