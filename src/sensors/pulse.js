@@ -23,7 +23,9 @@ async function keepAlive() {
         // console.log(`[SYSTEM] Token Refreshed.`);
         setTimeout(keepAlive, 55 * 60 * 1000); 
     } catch (err) {
-        console.error('[SYSTEM] FATAL: Could not refresh token!', err);
+        console.error('[SYSTEM] FATAL: Could not refresh token!', err.body || err.message);
+        // Do not proceed to start loop if auth fails
+        throw err;
     }
 }
 
@@ -82,7 +84,11 @@ async function checkPulse() {
         }
 
     } catch (err) {
-        if (err.statusCode === 401) console.error('[ERROR] Token Expired');
+        if (err.statusCode === 401) { 
+            console.error('[ERROR] Token Expired - Attempting immediate refresh...');
+            // Optional: try to refresh immediately
+            keepAlive().catch(e => console.error("Immediate refresh failed", e));
+        }
         else if (err.code === 'ECONNREFUSED') console.error('[ERROR] No Internet');
         else console.error(`[ERROR]`, err.message);
     }
@@ -95,6 +101,8 @@ function startPulseSensor() {
     keepAlive().then(() => {
         checkPulse();
         setInterval(checkPulse, 5000); 
+    }).catch(err => {
+        console.error("[SYSTEM] Pulse Sensor failed to start due to Auth Error.");
     });
 }
 

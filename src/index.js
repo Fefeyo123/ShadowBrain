@@ -4,11 +4,17 @@ require('dotenv').config({ path: envPath });
 
 console.log('[DEBUG] Loading .env from:', envPath);
 console.log('[DEBUG] Loaded PORT:', process.env.PORT);
+
 const express = require('express');
 const bodyParser = require('body-parser');
-const { createClient } = require('@supabase/supabase-js');
+const cors = require('cors');
+
+// Sensors
 const { startPulseSensor } = require('./sensors/pulse');
 const { startLimbicSensor } = require('./sensors/limbic');
+
+// Routes
+const mainRoutes = require('./routes'); // ./routes/index.js
 
 // --- CONSOLE INTERCEPTION ---
 global.logBuffer = [];
@@ -25,9 +31,6 @@ console.log = function(...args) {
     originalLog.apply(console, args);
 };
 
-const cors = require('cors'); // Enable CORS for Frontend access
-const apiRoutes = require('./api/routes');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -35,15 +38,18 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: process.env.CORS_ORIGIN || '*'
 }));
-app.use(bodyParser.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Security Middleware (Require SHADOW_KEY)
 app.use('/api', require('./middleware/auth'));
 
-// API Routes
+// Sensor Inputs (Legacy/Direct)
 app.use('/api/gps', require('./sensors/compass'));
 app.use('/api/vital', require('./sensors/vital'));
-app.use('/api', apiRoutes);
+
+// Main API
+app.use('/api', mainRoutes);
 
 // --- IGNITION ---
 

@@ -6,6 +6,12 @@ module.exports = (req, res, next) => {
     const apiKey = req.headers['x-shadow-key'];
     const validKey = process.env.SHADOW_KEY;
 
+    // Exempt specific routes from Auth
+    // We check req.originalUrl because this middleware is mounted at '/api', so req.path might be relative.
+    if (req.originalUrl.startsWith('/api/gps') || req.originalUrl.startsWith('/api/vital')) {
+        return next();
+    }
+
     // Fail safe: If no key is configured on server, block everything to prevent accidental exposure
     if (!validKey) {
         console.error('[SECURITY] SHADOW_KEY not set in environment variables! Blocking request.');
