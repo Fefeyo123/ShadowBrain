@@ -23,10 +23,13 @@ exports.register = async (req, res) => {
                 .select('credential_id') // Adjust column name if needed (usually credentialId or external_id)
                 .eq('user_id', username); // Mapping username to user_id for simplicity
 
+            // SimpleWebAuthn requires userID to be a Buffer or Uint8Array
+            const userID = SimpleWebAuthn.isoUint8Array.fromUTF8String(username);
+
             const options = await SimpleWebAuthn.generateRegistrationOptions({
                 rpName,
                 rpID,
-                userID: username, // simplistic user ID
+                userID,
                 userName: username,
                 // Don't exclude credentials for now to allow multiple devices or re-registration testing
                 // excludeCredentials: userCredentials?.map(cred => ({
