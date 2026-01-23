@@ -65,10 +65,6 @@ exports.register = async (req, res) => {
 
             if (verification.verified) {
                 const { registrationInfo } = verification;
-                console.log('[DEBUG] Registration Info:', JSON.stringify(registrationInfo, (key, value) => 
-                    key === 'credentialPublicKey' ? '[Uint8Array]' : value
-                , 2));
-                
                 const { credential } = registrationInfo;
                 if (!credential) {
                     throw new Error('Missing credential in registrationInfo');
