@@ -103,7 +103,7 @@ SELECT
     SUM(value)::numeric(10,2) as total_value, -- Useful for Steps/Calories
     MAX(unit) as unit
 FROM view_health_metrics
-GROUP BY 1, 2
+GROUP BY 1, 2;
 
 -- 7. LOCATION HISTORY (Traccar)
 -- Output: | timestamp | lat | lon | speed | battery | device |

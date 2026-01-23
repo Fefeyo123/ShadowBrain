@@ -13,6 +13,15 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 app.use(bodyParser.json({ limit: '50mb' }));
 
+// --- DEBUG LOGGER ---
+app.use((req, res, next) => {
+    // Don't log the root health check to avoid spam
+    if (req.path !== '/') {
+        console.log(`[REQUEST] ${req.method} ${req.path}`);
+    }
+    next();
+});
+
 const vitalRouter = require('./sensors/vital');
 const gpsRouter = require('./sensors/gps');
 
