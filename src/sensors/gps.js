@@ -16,6 +16,7 @@ router.all('/', async (req, res) => {
         
         // 2. Validation
         if (!data.lat || !data.lon) {
+            console.warn(`[GPS] Invalid Payload. Data received:`, JSON.stringify(data));
             return res.status(400).send('Missing lat/lon');
         }
 

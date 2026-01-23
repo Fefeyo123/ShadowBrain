@@ -12,6 +12,7 @@ const SHADOW_SECRET = process.env.SHADOW_SECRET;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true })); // Required for Traccar Client
 
 // --- DEBUG LOGGER ---
 app.use((req, res, next) => {
