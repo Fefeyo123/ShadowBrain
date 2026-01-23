@@ -14,6 +14,7 @@ module.exports = (req, res, next) => {
 
     if (!apiKey || apiKey !== validKey) {
         console.warn(`[SECURITY] Unauthorized access attempt from ${req.ip}`);
+        console.warn(`[DEBUG] Received Key: '${apiKey ? '***' + apiKey.slice(-3) : 'MISSING'}' | Expected Key: '${validKey ? '***' + validKey.slice(-3) : 'MISSING'}'`);
         return res.status(401).json({ error: "Unauthorized: Invalid Shadow Key" });
     }
 
