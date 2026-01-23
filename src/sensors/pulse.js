@@ -67,7 +67,7 @@ async function checkPulse() {
             context_uri: track.context ? track.context.uri : null
         };
 
-        console.log(`[PULSE] ${new Date().toLocaleTimeString()} | 🎵 ${eventData.track} - ${eventData.artist}`);
+        console.log(`[PULSE] ${new Date().toLocaleTimeString()} | >> ${eventData.track} // ${eventData.artist}`);
 
         const { error } = await supabase
             .from('shadow_events')
@@ -88,11 +88,14 @@ async function checkPulse() {
     }
 }
 
-// 4. Start
-console.log("--- SHADOW PULSE ONLINE ---");
-console.log("Listening for raw audio events (5s interval)...");
+// 4. Start Function
+function startPulseSensor() {
+    console.log("--- SHADOW PULSE ONLINE ---");
 
-keepAlive().then(() => {
-    checkPulse();
-    setInterval(checkPulse, 5000); 
-});
+    keepAlive().then(() => {
+        checkPulse();
+        setInterval(checkPulse, 5000); 
+    });
+}
+
+module.exports = { startPulseSensor };

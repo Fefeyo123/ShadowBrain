@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "gettoken.js",
   "scripts": {
-    "start": "node src/sensors/pulse.js",
+    "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,7 +12,10 @@
   "description": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.91.0",
+    "axios": "^1.13.2",
+    "body-parser": "^2.2.2",
     "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "open": "^11.0.0",
     "spotify-web-api-node": "^5.0.2"
   }
