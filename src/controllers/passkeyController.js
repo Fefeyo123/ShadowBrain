@@ -65,6 +65,10 @@ exports.register = async (req, res) => {
 
             if (verification.verified) {
                 const { registrationInfo } = verification;
+                console.log('[DEBUG] Registration Info:', JSON.stringify(registrationInfo, (key, value) => 
+                    key === 'credentialPublicKey' ? '[Uint8Array]' : value
+                , 2));
+                
                 const { credentialID, credentialPublicKey, counter } = registrationInfo;
 
                 // Save to DB
@@ -80,10 +84,17 @@ exports.register = async (req, res) => {
                 // Helper to encode buffer
                 // const isoBase64URL = SimpleWebAuthn.isoBase64URL; // Not available
                 
+                if (!credentialID || !credentialPublicKey) {
+                    throw new Error('Missing credentialID or credentialPublicKey in registrationInfo');
+                }
+
+                const credentialIdStr = typeof credentialID === 'string' ? credentialID : Buffer.from(credentialID).toString('base64url');
+                const publicKeyStr = typeof credentialPublicKey === 'string' ? credentialPublicKey : Buffer.from(credentialPublicKey).toString('base64url');
+
                 const newCredential = {
                     user_id: username,
-                    credential_id: Buffer.from(credentialID).toString('base64url'), 
-                    public_key: Buffer.from(credentialPublicKey).toString('base64url'),
+                    credential_id: credentialIdStr, 
+                    public_key: publicKeyStr,
                     counter,
                     transports: data.response.transports || [],
                 };
