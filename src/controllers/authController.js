@@ -52,3 +52,20 @@ exports.updateCredentialCounter = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+
+exports.login = (req, res) => {
+    try {
+        const { password } = req.body;
+        const validPassword = process.env.AUTH_PASSWORD;
+
+        // Simple string comparison
+        if (password === validPassword) {
+            return res.json({ success: true });
+        }
+        
+        return res.status(401).json({ success: false, error: "Invalid Access Code" });
+    } catch (err) {
+        console.error('[API] Login Error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};

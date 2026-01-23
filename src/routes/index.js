@@ -5,6 +5,7 @@ const systemRoutes = require('./systemRoutes');
 const streamRoutes = require('./streamRoutes');
 const vitalRoutes = require('./vitalRoutes');
 const authRoutes = require('./authRoutes');
+const authController = require('../controllers/authController');
 
 // Version 1 API
 router.use('/v1', systemRoutes); // /status, /console
@@ -40,5 +41,7 @@ router.use('/v1', systemRoutes);
 router.use('/v1/stream', streamRoutes);
 router.use('/v1', vitalRoutes); // vitalRoutes has /pulse
 router.use('/v1/storage', authRoutes);
+router.use('/auth/passkey', require('./passkeyRoutes'));
+router.post('/auth/login', authController.login);
 
 module.exports = router;
