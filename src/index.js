@@ -38,6 +38,8 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // API Routes
+app.use('/api/gps', require('./sensors/compass'));
+app.use('/api/vital', require('./sensors/vital'));
 app.use('/api', apiRoutes);
 
 // --- IGNITION ---
