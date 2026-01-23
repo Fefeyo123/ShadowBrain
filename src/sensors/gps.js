@@ -12,11 +12,26 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 router.all('/', async (req, res) => {
     try {
         // 1. Data Extraction (Query or Body)
-        const data = Object.keys(req.query).length > 0 ? req.query : req.body;
+        let data = Object.keys(req.query).length > 0 ? req.query : req.body;
         
+        // SUPPORT: Nested JSON format (Traccar Client specific?)
+        // Payload: { location: { coords: { latitude, longitude, ... } }, ... }
+        if (data.location && data.location.coords) {
+            const coords = data.location.coords;
+            data = {
+                lat: coords.latitude,
+                lon: coords.longitude,
+                speed: coords.speed,
+                altitude: coords.altitude,
+                accuracy: coords.accuracy,
+                batt: data.batteryLevel || 0, // Sometimes at root or extras
+                id: data.id || 'iPhone_Manual_Sync' // Fallback
+            };
+        }
+
         // 2. Validation
         if (!data.lat || !data.lon) {
-            console.warn(`[GPS] Invalid Payload. Data received:`, JSON.stringify(data));
+            console.warn(`[GPS] Invalid Payload. Data received:`, JSON.stringify(req.body));
             return res.status(400).send('Missing lat/lon');
         }
 
