@@ -20,7 +20,7 @@ exports.register = async (req, res) => {
             // Get user's existing credentials to prevent re-registration
             const { data: userCredentials } = await supabase
                 .from('auth_credentials')
-                .select('credential_id') // Adjust column name if needed (usually credentialId or external_id)
+                .select('id') // Column is 'id' based on schema inspection
                 .eq('user_id', username); // Mapping username to user_id for simplicity
 
             // SimpleWebAuthn requires userID to be a Buffer or Uint8Array
@@ -81,7 +81,7 @@ exports.register = async (req, res) => {
 
                 const newCredential = {
                     user_id: username,
-                    credential_id: credentialIdStr, 
+                    id: credentialIdStr, // Column is 'id' 
                     public_key: publicKeyStr,
                     counter,
                     transports: transports || [],
@@ -135,7 +135,7 @@ exports.authenticate = async (req, res) => {
             const options = await SimpleWebAuthn.generateAuthenticationOptions({
                 rpID,
                 allowCredentials: userCredentials.map(cred => ({
-                    id: cred.credential_id, // SimpleWebAuthn handles base64url string
+                    id: cred.id, // Column is 'id'
                     type: 'public-key',
                     transports: cred.transports,
                 })),
@@ -158,7 +158,7 @@ exports.authenticate = async (req, res) => {
             const { data: credData, error } = await supabase
                 .from('auth_credentials')
                 .select('*')
-                .eq('credential_id', credentialId)
+                .eq('id', credentialId)
                 .single();
 
             if (error || !credData) {
@@ -174,7 +174,7 @@ exports.authenticate = async (req, res) => {
                 expectedOrigin: origin,
                 expectedRPID: rpID,
                 authenticator: {
-                    credentialID: Buffer.from(credData.credential_id, 'base64url'),
+                    credentialID: Buffer.from(credData.id, 'base64url'),
                     credentialPublicKey: credentialPublicKey,
                     counter: credData.counter,
                     transports: credData.transports,
