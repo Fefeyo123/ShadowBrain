@@ -87,19 +87,25 @@ exports.register = async (req, res) => {
                     transports: transports || [],
                 };
 
+                console.log('[DEBUG] Prepared Credential Object:', JSON.stringify(newCredential, null, 2));
+
                 const { error } = await supabase
                     .from('auth_credentials')
                     .insert([newCredential]);
 
-                if (error) throw error;
+                if (error) {
+                    console.error('[DEBUG] Supabase Insert Error:', JSON.stringify(error, null, 2));
+                    throw error;
+                }
                 
+                console.log('[DEBUG] Credential saved to DB');
                 challengeStore.delete(username);
                 return res.json({ verified: true });
             }
             return res.json({ verified: false, error: 'Verification failed' });
         }
     } catch (err) {
-        console.error('[Passkey] Register Error:', err);
+        console.error('[Passkey] Register Error Details:', err);
         res.status(500).json({ error: err.message });
     }
 };
