@@ -69,24 +69,12 @@ exports.register = async (req, res) => {
                     key === 'credentialPublicKey' ? '[Uint8Array]' : value
                 , 2));
                 
-                const { credentialID, credentialPublicKey, counter } = registrationInfo;
-
-                // Save to DB
-                // credentialID is a Buffer, needs to be base64url or hex
-                // database schema likely expects strings.
-                
-                // Inspecting existing authController.js:
-                // .from('auth_credentials').insert([credential])
-                
-                // We need to match the schema. 
-                // Let's assume schema: user_id, credential_id, public_key, counter, transports
-                
-                // Helper to encode buffer
-                // const isoBase64URL = SimpleWebAuthn.isoBase64URL; // Not available
-                
-                if (!credentialID || !credentialPublicKey) {
-                    throw new Error('Missing credentialID or credentialPublicKey in registrationInfo');
+                const { credential } = registrationInfo;
+                if (!credential) {
+                    throw new Error('Missing credential in registrationInfo');
                 }
+
+                const { id: credentialID, publicKey: credentialPublicKey, counter, transports } = credential;
 
                 const credentialIdStr = typeof credentialID === 'string' ? credentialID : Buffer.from(credentialID).toString('base64url');
                 const publicKeyStr = typeof credentialPublicKey === 'string' ? credentialPublicKey : Buffer.from(credentialPublicKey).toString('base64url');
@@ -96,7 +84,7 @@ exports.register = async (req, res) => {
                     credential_id: credentialIdStr, 
                     public_key: publicKeyStr,
                     counter,
-                    transports: data.response.transports || [],
+                    transports: transports || [],
                 };
 
                 const { error } = await supabase
