@@ -24,7 +24,7 @@ exports.register = async (req, res) => {
                 .eq('user_id', username); // Mapping username to user_id for simplicity
 
             // SimpleWebAuthn requires userID to be a Buffer or Uint8Array
-            const userID = SimpleWebAuthn.isoUint8Array.fromUTF8String(username);
+            const userID = new Uint8Array(Buffer.from(username));
 
             const options = await SimpleWebAuthn.generateRegistrationOptions({
                 rpName,
@@ -78,12 +78,12 @@ exports.register = async (req, res) => {
                 // Let's assume schema: user_id, credential_id, public_key, counter, transports
                 
                 // Helper to encode buffer
-                const isoBase64URL = SimpleWebAuthn.isoBase64URL;
+                // const isoBase64URL = SimpleWebAuthn.isoBase64URL; // Not available
                 
                 const newCredential = {
                     user_id: username,
-                    credential_id: isoBase64URL.fromBuffer(credentialID), 
-                    public_key: isoBase64URL.fromBuffer(credentialPublicKey),
+                    credential_id: Buffer.from(credentialID).toString('base64url'), 
+                    public_key: Buffer.from(credentialPublicKey).toString('base64url'),
                     counter,
                     transports: data.response.transports || [],
                 };
@@ -153,8 +153,8 @@ exports.authenticate = async (req, res) => {
                 return res.status(400).json({ error: 'Credential not found' });
             }
             
-            const isoBase64URL = SimpleWebAuthn.isoBase64URL;
-            const credentialPublicKey = isoBase64URL.toBuffer(credData.public_key);
+            // const isoBase64URL = SimpleWebAuthn.isoBase64URL; // Not available
+            const credentialPublicKey = Buffer.from(credData.public_key, 'base64url');
 
             const verification = await SimpleWebAuthn.verifyAuthenticationResponse({
                 response: data,
@@ -162,7 +162,7 @@ exports.authenticate = async (req, res) => {
                 expectedOrigin: origin,
                 expectedRPID: rpID,
                 authenticator: {
-                    credentialID: isoBase64URL.toBuffer(credData.credential_id),
+                    credentialID: Buffer.from(credData.credential_id, 'base64url'),
                     credentialPublicKey: credentialPublicKey,
                     counter: credData.counter,
                     transports: credData.transports,
