@@ -37,6 +37,9 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
+// Security Middleware (Require SHADOW_KEY)
+app.use('/api', require('./middleware/auth'));
+
 // API Routes
 app.use('/api/gps', require('./sensors/compass'));
 app.use('/api/vital', require('./sensors/vital'));
