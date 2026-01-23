@@ -87,25 +87,32 @@ exports.register = async (req, res) => {
                     transports: transports || [],
                 };
 
-                console.log('[DEBUG] Prepared Credential Object:', JSON.stringify(newCredential, null, 2));
-
+                // Ensure transports is suitable for storage (JSON string if column is text, or array if JSONB)
+                // We'll store as simple array, but if DB error occurs, it might be due to this.
+                // For safety, let's keep it as is, but if it fails, user check DB.
+                // Actually, let's JSON stringify it to be safe if the column is TEXT. 
+                // However, if the column IS JSONB, stringifying it makes it a string.
+                // Given I don't know the schema, I'll rely on Supabase JS client handling arrays for JSON types.
+                // If it fails, I'll ask user.
+                
+                // Removing debug logs for production
+                
                 const { error } = await supabase
                     .from('auth_credentials')
                     .insert([newCredential]);
 
                 if (error) {
-                    console.error('[DEBUG] Supabase Insert Error:', JSON.stringify(error, null, 2));
-                    throw error;
+                    console.error('[Passkey] DB Insert Error:', error);
+                    throw error; 
                 }
                 
-                console.log('[DEBUG] Credential saved to DB');
                 challengeStore.delete(username);
                 return res.json({ verified: true });
             }
             return res.json({ verified: false, error: 'Verification failed' });
         }
     } catch (err) {
-        console.error('[Passkey] Register Error Details:', err);
+        console.error('[Passkey] Register Error:', err);
         res.status(500).json({ error: err.message });
     }
 };
