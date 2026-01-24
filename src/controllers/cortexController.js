@@ -1,24 +1,6 @@
-const express = require('express');
-const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
+const supabase = require('../config/supabase');
 
-const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// GITHUB SECRET (Configuration)
-const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
-
-// 1. Signature Verification Middleware
-// Note: For strict security, use raw-body HMAC check. 
-// For this MVP, we rely on the header presence or secret if configured.
-const verifySignature = (req, res, next) => {
-    // Ideally we verify 'x-hub-signature-256' against the raw body + secret.
-    // Express body-parser modifies the body, making signature check complex without 'verify' hook.
-    // Proceeding without signature for now (Rely on URL secrecy).
-    next();
-};
-
-router.post('/', async (req, res) => {
+exports.handleWebhook = async (req, res) => {
     try {
         const event = req.headers['x-github-event'];
         const payload = req.body;
@@ -78,9 +60,7 @@ router.post('/', async (req, res) => {
         res.status(200).send('Ignored Event');
 
     } catch (err) {
-        console.error('[WORK] Error:', err.message);
+        console.error('[CORTEX ERROR]', err.message);
         res.status(500).send('Server Error');
     }
-});
-
-module.exports = router;
+};

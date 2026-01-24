@@ -9,9 +9,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
-// Sensors
-const { startPulseSensor } = require('./sensors/pulse');
-const { startLimbicSensor } = require('./sensors/limbic');
+// Services
+const { startPulseSensor } = require('./services/pulseService');
+const { startLimbicSensor } = require('./services/limbicService');
+const { startAtmosphereSensor } = require('./services/atmosphereService');
 
 // Routes
 const mainRoutes = require('./routes'); // ./routes/index.js
@@ -44,12 +45,18 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Security Middleware (Require SHADOW_KEY)
 app.use('/api', require('./middleware/auth'));
 
-// Sensor Inputs (Legacy/Direct)
-app.use('/api/gps', require('./sensors/compass'));
-app.use('/api/vital', require('./sensors/vital'));
+// Ingest Routes (Compass & Vital & Cortex)
+app.use('/api/gps', require('./routes/compassRoutes'));
+app.use('/api/vital', require('./routes/ingestRoutes'));
+app.use('/api/cortex', require('./routes/cortexRoutes'));
 
 // Main API
 app.use('/api', mainRoutes);
+
+// Catch-all 404
+app.use((req, res, next) => {
+    res.status(404).send('Not Found by ShadowBrain');
+});
 
 // --- IGNITION ---
 
@@ -60,7 +67,7 @@ app.listen(PORT, () => {
     console.log("⊙⊙⊙ SHADOW COMPASS ONLINE ⊙⊙⊙");
     console.log("⌁⌁⌁ SHADOW CORTEX ONLINE ⌁⌁⌁");
 
-    // Start Background Sensors
     startPulseSensor();
     startLimbicSensor();
+    startAtmosphereSensor();
 });

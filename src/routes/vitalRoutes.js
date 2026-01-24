@@ -8,7 +8,7 @@ const vitalController = require('../controllers/vitalController');
 // For now, let's just use the controller for the specific /pulse endpoint validation found in routes.js
 // AND mount the sensor specific routes if they are complex.
 
-const vitalSensorRoutes = require('../sensors/vital');
+// Sensor routes have been moved to ../routes/ingestRoutes.js
 
 router.get('/pulse', vitalController.getPulse);
 

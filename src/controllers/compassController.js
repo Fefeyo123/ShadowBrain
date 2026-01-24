@@ -1,15 +1,6 @@
-const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const supabase = require('../config/supabase');
 
-const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// TRACCAR / OSMAND PROTOCOL
-// Endpoint: POST /api/gps
-// Traccar Client sends: ?id=deviceid&lat=50.0&lon=4.0&timestamp=17000000&speed=0...
-// Or via Body in JSON mode. We support Query Parameters (OsmAnd standard).
-
-router.all('/', async (req, res) => {
+exports.ingestLocation = async (req, res) => {
     try {
         // 1. Data Extraction (Query or Body)
         let data = Object.keys(req.query).length > 0 ? req.query : req.body;
@@ -77,9 +68,7 @@ router.all('/', async (req, res) => {
         res.status(200).send('OK');
 
     } catch (err) {
-        console.error('[GPT ERROR]', err.message);
+        console.error('[COMPASS ERROR]', err.message);
         res.status(500).send('Error');
     }
-});
-
-module.exports = router;
+};

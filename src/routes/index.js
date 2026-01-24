@@ -8,6 +8,7 @@ const authRoutes = require('./authRoutes');
 const authController = require('../controllers/authController');
 
 // Version 1 API
+router.use('/v1/atmosphere', require('./atmosphereRoutes'));
 router.use('/v1', systemRoutes); // /status, /console
 router.use('/v1/stream', streamRoutes);
 router.use('/v1/pulse', vitalRoutes); // Note: The original was /v1/pulse directly. 
