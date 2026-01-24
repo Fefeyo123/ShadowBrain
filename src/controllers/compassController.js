@@ -72,3 +72,62 @@ exports.ingestLocation = async (req, res) => {
         res.status(500).send('Error');
     }
 };
+
+exports.getLatestLocation = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('view_location_history')
+            .select('*')
+            .limit(1)
+            .single();
+
+        if (error) {
+             // If no rows, .single() returns formatted error code usually 'PGRST116'
+            if (error.code === 'PGRST116') {
+                 return res.status(404).json({ message: "No location history found" });
+            }
+            throw error;
+        }
+
+        res.json(data);
+
+    } catch (err) {
+        console.error('[COMPASS] Read Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.getLocationHistory = async (req, res) => {
+    try {
+        const { range } = req.query; // '24h' or '7d'
+        
+        // Determine time filter
+        const now = new Date();
+        let since = new Date();
+        let limit = 1000; // Default limit
+
+        if (range === '7d') {
+            since.setDate(now.getDate() - 7);
+            limit = 5000; // Allow more points for a week
+        } else {
+            // Default to 24h
+            since.setHours(now.getHours() - 24);
+            limit = 1000;
+        }
+        
+        const { data, error } = await supabase
+            .from('view_location_history')
+            .select('lat, lon, timestamp')
+            .gte('timestamp', since.toISOString())
+            .order('timestamp', { ascending: false }) // Newest first
+            .limit(limit);
+
+        if (error) throw error;
+
+        res.json(data);
+
+    } catch (err) {
+        console.error('[COMPASS] History Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
