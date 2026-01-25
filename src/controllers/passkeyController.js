@@ -121,7 +121,7 @@ exports.authenticate = async (req, res) => {
             // Get user credentials
             const { data: userCredentials } = await supabase
                 .from('auth_credentials')
-                .select('credential_id, transports') // Fetch transports too if available
+                .select('id, transports') // Fetch transports too if available
                 .eq('user_id', username);
 
             if (!userCredentials || userCredentials.length === 0) {
@@ -133,7 +133,7 @@ exports.authenticate = async (req, res) => {
                 allowCredentials: userCredentials.map(cred => ({
                     id: cred.id, // Column is 'id'
                     type: 'public-key',
-                    transports: cred.transports,
+                    transports: typeof cred.transports === 'string' ? JSON.parse(cred.transports) : cred.transports,
                 })),
                 userVerification: 'preferred',
             });
@@ -169,11 +169,11 @@ exports.authenticate = async (req, res) => {
                 expectedChallenge,
                 expectedOrigin: origin,
                 expectedRPID: rpID,
-                authenticator: {
-                    credentialID: Buffer.from(credData.id, 'base64url'),
-                    credentialPublicKey: credentialPublicKey,
-                    counter: credData.counter,
-                    transports: credData.transports,
+                credential: {
+                    id: credData.id,
+                    publicKey: credentialPublicKey,
+                    counter: credData.counter || 0,
+                    transports: typeof credData.transports === 'string' ? JSON.parse(credData.transports) : credData.transports,
                 },
             });
 

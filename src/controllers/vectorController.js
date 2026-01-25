@@ -32,7 +32,7 @@ exports.ingestLocation = async (req, res) => {
 
         // 2. Validation
         if (!data.lat || !data.lon) {
-            console.warn(`[COMPASS] Invalid Payload. Data received:`, JSON.stringify(req.body));
+            console.warn(`[VECTOR] Invalid Payload. Data received:`, JSON.stringify(req.body));
             return res.status(400).send('Missing lat/lon');
         }
 
@@ -64,11 +64,11 @@ exports.ingestLocation = async (req, res) => {
 
         if (error) throw error;
 
-        console.log(`⊙ [COMPASS] Location stored: ${data.lat}, ${data.lon} (Dev: ${deviceId})`);
+        console.log(`⊙ [VECTOR] Location stored: ${data.lat}, ${data.lon} (Dev: ${deviceId})`);
         res.status(200).send('OK');
 
     } catch (err) {
-        console.error('[COMPASS ERROR]', err.message);
+        console.error('[VECTOR ERROR]', err.message);
         res.status(500).send('Error');
     }
 };
@@ -92,7 +92,7 @@ exports.getLatestLocation = async (req, res) => {
         res.json(data);
 
     } catch (err) {
-        console.error('[COMPASS] Read Error:', err.message);
+        console.error('[VECTOR] Read Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
@@ -127,7 +127,7 @@ exports.getLocationHistory = async (req, res) => {
         res.json(data);
 
     } catch (err) {
-        console.error('[COMPASS] History Error:', err.message);
+        console.error('[VECTOR] History Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };

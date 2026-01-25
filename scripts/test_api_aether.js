@@ -24,15 +24,15 @@ async function testApi() {
         console.error('[TEST] /api/v1/status Failed:', e.message);
     }
     
-    // 3. Atmosphere Check
+    // 3. Aether Check
     try {
-        console.log('[TEST] Calling Atmosphere API...');
-        const res = await axios.get('http://127.0.0.1:3001/api/v1/atmosphere', { headers });
+        console.log('[TEST] Calling Aether API...');
+        const res = await axios.get('http://127.0.0.1:3001/api/v1/aether', { headers });
         console.log('[TEST] Status:', res.status);
         console.log('[TEST] Meta:', res.data.meta);
         console.log('[TEST] Daily Items:', res.data.daily ? res.data.daily.length : 0);
     } catch (err) {
-        console.error('[TEST] Atmosphere API Failed:', err.message);
+        console.error('[TEST] Aether API Failed:', err.message);
     }
 }
 

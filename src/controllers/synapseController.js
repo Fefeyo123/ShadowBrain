@@ -1,9 +1,9 @@
 /**
- * Limbic Controller
+ * Synapse Controller
  * Handles fetching gaming status, history, stats, and achievements.
  */
 const supabase = require('../config/supabase');
-const limbicService = require('../services/limbicService');
+const synapseService = require('../services/synapseService');
 
 // Get current gaming status (or last played)
 exports.getStatus = async (req, res) => {
@@ -37,7 +37,7 @@ exports.getStatus = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('[API] Limbic Status Error:', err.message);
+        console.error('[API] Synapse Status Error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 };
@@ -55,7 +55,7 @@ exports.getHistory = async (req, res) => {
 
         res.json({ success: true, count: data.length, data });
     } catch (err) {
-        console.error('[API] Limbic History Error:', err.message);
+        console.error('[API] Synapse History Error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 };
@@ -63,10 +63,10 @@ exports.getHistory = async (req, res) => {
 // Get comprehensive stats (playtime, top games, library)
 exports.getStats = async (req, res) => {
     try {
-        const stats = await limbicService.getStats();
+        const stats = await synapseService.getStats();
         res.json({ success: true, ...stats });
     } catch (err) {
-        console.error('[API] Limbic Stats Error:', err.message);
+        console.error('[API] Synapse Stats Error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 };
@@ -74,14 +74,14 @@ exports.getStats = async (req, res) => {
 // Get recent achievements
 exports.getAchievements = async (req, res) => {
     try {
-        const achievements = await limbicService.getRecentAchievements();
+        const achievements = await synapseService.getRecentAchievements();
         res.json({ 
             success: true, 
             count: achievements.length, 
             achievements 
         });
     } catch (err) {
-        console.error('[API] Limbic Achievements Error:', err.message);
+        console.error('[API] Synapse Achievements Error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 };

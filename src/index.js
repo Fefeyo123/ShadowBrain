@@ -11,8 +11,8 @@ const cors = require('cors');
 
 // Services
 const { startPulseSensor } = require('./services/pulseService');
-const { startLimbicSensor } = require('./services/limbicService');
-const { startAtmosphereSensor } = require('./services/atmosphereService');
+const { startSynapseSensor } = require('./services/synapseService');
+const { startAetherSensor } = require('./services/aetherService');
 
 // Routes
 const mainRoutes = require('./routes'); // ./routes/index.js
@@ -45,8 +45,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Security Middleware (Require SHADOW_KEY)
 app.use('/api', require('./middleware/auth'));
 
-// Ingest Routes (Compass & Vital & Cortex)
-app.use('/api/gps', require('./routes/compassRoutes'));
+// Ingest Routes (Vector & Vital & Cortex)
+app.use('/api/vector', require('./routes/vectorRoutes'));
 app.use('/api/vital', require('./routes/ingestRoutes'));
 app.use('/api/cortex', require('./routes/cortexRoutes'));
 
@@ -64,10 +64,10 @@ app.listen(PORT, () => {
     console.log(`[SYSTEM] Brain Stem Listening on Port ${PORT}`);
     
     console.log("♡♡♡ SHADOW VITAL ONLINE ♡♡♡");
-    console.log("⊙⊙⊙ SHADOW COMPASS ONLINE ⊙⊙⊙");
+    console.log("⊙⊙⊙ SHADOW VECTOR ONLINE ⊙⊙⊙");
     console.log("⌁⌁⌁ SHADOW CORTEX ONLINE ⌁⌁⌁");
 
     startPulseSensor();
-    startLimbicSensor();
-    startAtmosphereSensor();
+    startSynapseSensor();
+    startAetherSensor();
 });

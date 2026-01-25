@@ -105,7 +105,7 @@ SELECT
 FROM view_health_metrics
 GROUP BY 1, 2;
 
--- 7. LOCATION HISTORY (Compass / Traccar)
+-- 7. LOCATION HISTORY (Vector / Traccar)
 -- Output: | timestamp | lat | lon | speed | battery | device |
 CREATE OR REPLACE VIEW view_location_history AS
 SELECT 
@@ -133,7 +133,7 @@ FROM shadow_events
 WHERE event_type = 'code_push'
 ORDER BY timestamp DESC;
 
--- 9. GAME HISTORY (Limbic / Steam)
+-- 9. GAME HISTORY (Synapse / Steam)
 -- Output: | timestamp | status | game |
 CREATE OR REPLACE VIEW view_game_history AS
 SELECT 

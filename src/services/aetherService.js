@@ -11,7 +11,7 @@ const POLL_INTERVAL = 15 * 60 * 1000; // 15 Minutes
 
 async function updateWeather() {
     try {
-        console.log('[ATMOSPHERE] Polling Atmosphere...');
+        console.log('[AETHER] Polling Aether...');
 
         // 0. Load dependency if needed
         if (!fetchWeatherApi) {
@@ -29,12 +29,12 @@ async function updateWeather() {
             .single(); // .single() returns object or null
 
         if (locError || !locationData) {
-            console.warn('[ATMOSPHERE] No location found in history. Skipping update.');
+            console.warn('[AETHER] No location found in history. Skipping update.');
             return;
         }
 
         const { lat, lon } = locationData;
-        console.log(`[ATMOSPHERE] Scanning sector: ${lat}, ${lon}`);
+        console.log(`[AETHER] Scanning sector: ${lat}, ${lon}`);
 
         // 2. Fetch Weather (User's Code Snippet Adapted)
         const params = {
@@ -148,16 +148,16 @@ async function updateWeather() {
 
         if (dbError) throw dbError;
 
-        console.log(`[ATMOSPHERE] Atmosphere data acquired for sector ${lat}, ${lon}`);
+        console.log(`[AETHER] Aether data acquired for sector ${lat}, ${lon}`);
 
     } catch (err) {
-        console.error('[ATMOSPHERE] Sensor Malfunction:', err.message);
+        console.error('[AETHER] Sensor Malfunction:', err.message);
         if (err.cause) console.error(err.cause);
     }
 }
 
-function startAtmosphereSensor() {
-    console.log("☇☇☇ SHADOW ATMOSPHERE ONLINE ☇☇☇");
+function startAetherSensor() {
+    console.log("☇☇☇ SHADOW AETHER ONLINE ☇☇☇");
     
     // Initial run after 5 seconds to let server start up
     setTimeout(updateWeather, 5000);
@@ -166,4 +166,4 @@ function startAtmosphereSensor() {
     setInterval(updateWeather, POLL_INTERVAL);
 }
 
-module.exports = { startAtmosphereSensor, updateWeather };
+module.exports = { startAetherSensor, updateWeather };

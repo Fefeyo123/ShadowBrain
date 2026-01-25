@@ -3,9 +3,9 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { createClient } = require('@supabase/supabase-js');
 
-// --- THE LIMBIC SENSOR ---
+// --- THE SYNAPSE SENSOR ---
 // Polls Valve's API (Steam) to see if you are playing games.
-// "Limbic" because gaming stimulates the reward system (Dopamine).
+// "Synapse" because gaming stimulates the reward system (Dopamine).
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -158,9 +158,9 @@ async function getRecentAchievements() {
 // POLLING FUNCTION (for live status logging)
 // ============================================
 
-async function checkLimbic() {
+async function checkSynapse() {
     if (!STEAM_KEY || !STEAM_ID) {
-        console.warn('[LIMBIC] Missing API Key or Steam ID in .env');
+        console.warn('[SYNAPSE] Missing API Key or Steam ID in .env');
         return;
     }
 
@@ -183,12 +183,12 @@ async function checkLimbic() {
             // STARTED PLAYING
             status = 'playing';
             gameName = currentGame;
-            console.log(`▵ [LIMBIC] ${new Date().toLocaleTimeString()} | >> Started Playing: ${gameName}`);
+            console.log(`▵ [SYNAPSE] ${new Date().toLocaleTimeString()} | >> Started Playing: ${gameName}`);
         } else {
             // STOPPED PLAYING
             status = 'stopped';
             gameName = lastGame; // The game that just finished
-            console.log(`▵ [LIMBIC] ${new Date().toLocaleTimeString()} | >> Stopped Playing: ${gameName}`);
+            console.log(`▵ [SYNAPSE] ${new Date().toLocaleTimeString()} | >> Stopped Playing: ${gameName}`);
         }
 
         lastGame = currentGame;
@@ -207,22 +207,22 @@ async function checkLimbic() {
                 }
             });
 
-        if (error) console.error('[LIMBIC] DB Error:', error.message);
+        if (error) console.error('[SYNAPSE] DB Error:', error.message);
 
     } catch (err) {
-        console.error('[LIMBIC] API Error:', err.message);
+        console.error('[SYNAPSE] API Error:', err.message);
     }
 }
 
-function startLimbicSensor() {
-    console.log("▵▵▵ SHADOW LIMBIC ONLINE ▵▵▵");
-    checkLimbic();
+function startSynapseSensor() {
+    console.log("▵▵▵ SHADOW SYNAPSE ONLINE ▵▵▵");
+    checkSynapse();
     // Poll every 60 seconds
-    setInterval(checkLimbic, 60000);
+    setInterval(checkSynapse, 60000);
 }
 
 module.exports = { 
-    startLimbicSensor,
+    startSynapseSensor,
     getStats,
     getRecentAchievements,
     fetchOwnedGames,

@@ -10,7 +10,7 @@ exports.getForecast = async (req, res) => {
             .single();
 
         if (error || !row) {
-            console.warn('[ATMOSPHERE] ⚠️ No weather data found in DB.');
+            console.warn('[AETHER] ⚠️ No weather data found in DB.');
             // Return empty structure rather than 404 to prevent frontend crashes
             return res.json({ 
                 meta: {}, 
@@ -72,7 +72,7 @@ exports.getForecast = async (req, res) => {
         res.json(response);
 
     } catch (err) {
-        console.error('[ATMOSPHERE] ❌ API Error:', err.message);
+        console.error('[AETHER] ❌ API Error:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };

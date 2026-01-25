@@ -2,7 +2,7 @@ const supabase = require('../config/supabase');
 const { sumArray, avgArray } = require('../utils/mathUtils');
 
 /**
- * GET /v1/biomass/overview
+ * GET /v1/carbon/overview
  * Returns Energy and Body groups
  */
 exports.getOverview = async (req, res) => {
@@ -56,7 +56,7 @@ exports.getOverview = async (req, res) => {
             updated_at: new Date().toISOString()
         });
     } catch (err) {
-        console.error('[ERROR] Get Biomass Overview:', err.message);
+        console.error('[ERROR] Get Carbon Overview:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
