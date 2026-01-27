@@ -2,6 +2,6 @@ const express = require('express');
 const router = express.Router();
 const cortexController = require('../controllers/cortexController');
 
-router.post('/', cortexController.handleWebhook);
+router.get('/', cortexController.getCortexData);
 
 module.exports = router;

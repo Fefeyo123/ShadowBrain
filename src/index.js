@@ -13,6 +13,7 @@ const cors = require('cors');
 const { startPulseSensor } = require('./services/pulseService');
 const { startSynapseSensor } = require('./services/synapseService');
 const { startAetherSensor } = require('./services/aetherService');
+const { startCortexSensor } = require('./services/screenTimeService');
 
 // Routes
 const mainRoutes = require('./routes'); // ./routes/index.js
@@ -70,4 +71,5 @@ app.listen(PORT, () => {
     startPulseSensor();
     startSynapseSensor();
     startAetherSensor();
+    startCortexSensor();
 });

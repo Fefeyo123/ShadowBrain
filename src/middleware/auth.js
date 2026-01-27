@@ -8,7 +8,7 @@ module.exports = (req, res, next) => {
 
     // Exempt specific routes from Auth
     // We check req.originalUrl because this middleware is mounted at '/api', so req.path might be relative.
-    if (req.originalUrl.startsWith('/api/gps') || req.originalUrl.startsWith('/api/vital')) {
+    if (req.originalUrl.startsWith('/api/gps') || req.originalUrl.startsWith('/api/vital') || req.originalUrl.startsWith('/api/vector')) {
         return next();
     }
 
