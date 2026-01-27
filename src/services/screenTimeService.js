@@ -1,9 +1,9 @@
 const axios = require('axios');
 const supabase = require('../config/supabase');
 
-const API_KEY = '2e34ba0491c12db29ef4d8e73d15cb85442470924b510bb0e19c8e416f0fc707';
-const BASE_URL = 'https://api.thescreentimenetwork.com/v1';
-const HANDLE = 'feyo';
+const API_KEY = process.env.CORTEX_API_KEY;
+const BASE_URL = process.env.CORTEX_BASE_URL;
+const HANDLE = process.env.CORTEX_HANDLE;
 
 // In-memory cache for latest data
 let latestScreenTimeData = {
