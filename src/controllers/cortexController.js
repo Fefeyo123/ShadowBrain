@@ -10,8 +10,8 @@ exports.getCortexData = (req, res) => {
         
         res.json({
             type: 'screen_time',
-            source: 'iphone', // Future: Add mac/windows
-            data: data
+            source: 'combined', 
+            data: data // Contains { totalScreenTime (iphone), mac, pc }
         });
     } catch (err) {
         console.error('[CORTEX ERROR]', err.message);

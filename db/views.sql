@@ -145,3 +145,16 @@ SELECT
 FROM shadow_events
 WHERE event_type = 'game_activity'
 ORDER BY timestamp DESC;
+
+-- 10. ACTIVITYWATCH LOGS (ShadowBrain / Windows / Mac)
+-- Output: | timestamp | duration | app_name | window_title | device_id |
+CREATE OR REPLACE VIEW view_activity_log AS
+SELECT 
+    timestamp,
+    (data->>'duration')::numeric as duration_seconds,
+    data->>'app' as app_name,
+    data->>'title' as window_title,
+    source as device_id
+FROM shadow_events
+WHERE event_type = 'window_activity'
+ORDER BY timestamp DESC;
