@@ -2,7 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const SpotifyWebApi = require('spotify-web-api-node');
 const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 
 // --- THE PULSE SENSOR ---
 // Listens to Spotify, logs events, and analyzes tracks with AI.
@@ -23,7 +23,13 @@ if (process.env.GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   geminiModel = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",
-      generationConfig: { responseMimeType: "application/json" }
+      generationConfig: { responseMimeType: "application/json" },
+      safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
+      ]
   });
   console.log("∿ [PULSE] Neural Analysis ENABLED (Gemini 2.0 Flash JSON Mode)");
 } else {
@@ -90,15 +96,18 @@ Output ONLY valid JSON matching this exact structure:
         const result = await geminiModel.generateContent(prompt);
         const response = result.response.text();
         
-        // Extract JSON using substring for maximum robustness against extra text/markdown
+        // Extra check because Gemini sometimes throws error directly as response rather than rejection
         let jsonStr = response.trim();
+        
+        // Fix for sometimes returning markdown blocks inside the parsed output
         const start = jsonStr.indexOf('{');
         const end = jsonStr.lastIndexOf('}');
         
         if (start !== -1 && end !== -1) {
             jsonStr = jsonStr.substring(start, end + 1);
         } else {
-            throw new Error("No JSON object found in AI response");
+            console.warn(`   [WARN] AI returned non-JSON array: ${jsonStr.substring(0, 100)}...`);
+            return null;
         }
         
         const analysis = JSON.parse(jsonStr);
@@ -111,7 +120,9 @@ Output ONLY valid JSON matching this exact structure:
         return analysis;
         
     } catch (err) {
-        console.warn(`   [WARN] AI Analysis failed: ${err.message}`);
+        console.warn(`   [WARN] AI Analysis failed for "${track}": ${err.message}`);
+        // Log more details if available
+        if (err.status) console.warn(`   [WARN] Status: ${err.status}`);
         return null;
     }
 }
@@ -245,14 +256,17 @@ async function retryMissingAnalyses() {
     // Run in background instead of blocking the request
     (async () => {
         try {
-            // Fetch recent 200 tracks to find missing ones
+            // Fetch tracks from the last 7 days to match dashboard stats perfectly
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            
             const { data: rows, error } = await supabase
                 .from('shadow_events')
-                .select('id, data')
+                .select('id, data, timestamp')
                 .eq('source', 'spotify')
                 .eq('event_type', 'track_played')
-                .order('timestamp', { ascending: false })
-                .limit(200);
+                .gte('timestamp', weekAgo.toISOString())
+                .order('timestamp', { ascending: false });
 
             if (error || !rows) {
                 console.error('[PULSE] Retry fetch error:', error?.message);
