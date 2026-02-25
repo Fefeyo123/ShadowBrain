@@ -21,8 +21,11 @@ let genAI = null;
 let geminiModel = null;
 if (process.env.GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  console.log("∿ [PULSE] Neural Analysis ENABLED (Gemini 2.0 Flash)");
+  geminiModel = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: { responseMimeType: "application/json" }
+  });
+  console.log("∿ [PULSE] Neural Analysis ENABLED (Gemini 2.0 Flash JSON Mode)");
 } else {
   console.warn("∿ [PULSE] Neural Analysis DISABLED (No GEMINI_API_KEY)");
 }
@@ -49,22 +52,41 @@ async function analyzeTrack(track, artist, genres) {
     try {
         const genreHint = genres.length > 0 ? `Known genres: ${genres.join(', ')}. ` : '';
         
-        const prompt = `Analyze this song for a music dashboard. Song: "${track}" by ${artist}. ${genreHint}
-Return ONLY valid JSON with no markdown: {"energy_level": <number 1-10>, "genre": "<one primary genre>", "mood": "<one descriptive word like Euphoric, Melancholic, Aggressive, Chill, Dreamy, Intense, Peaceful, Dark, etc>"}`;
+        const prompt = `You are an expert music data analyzer. Analyze the following song and provide its energy level, primary genre, and mood.
+If you do not recognize the specific song, make your best highly educated guess based on the artist and genres. Always return a valid JSON object, do not apologize or explain.
+
+Song: "${track}"
+Artist: ${artist}
+${genreHint}
+
+Output ONLY valid JSON matching this exact structure:
+{
+  "energy_level": <integer from 1 to 10>,
+  "genre": "<string, max 2 words>",
+  "mood": "<string, exactly one descriptive word (e.g., Euphoric, Melancholic, Chill, Energetic, Dark, Funky, etc.)>"
+}`;
 
         const result = await geminiModel.generateContent(prompt);
         const response = result.response.text();
         
-        // Parse JSON from response (handle potential markdown wrapping)
+        // Extract JSON using substring for maximum robustness against extra text/markdown
         let jsonStr = response.trim();
-        if (jsonStr.startsWith('```')) {
-            jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+        const start = jsonStr.indexOf('{');
+        const end = jsonStr.lastIndexOf('}');
+        
+        if (start !== -1 && end !== -1) {
+            jsonStr = jsonStr.substring(start, end + 1);
+        } else {
+            throw new Error("No JSON object found in AI response");
         }
         
         const analysis = JSON.parse(jsonStr);
         
-        // Validate and clamp energy_level
+        // Validate and clamp fields to ensure expected output shape
         analysis.energy_level = Math.max(1, Math.min(10, parseInt(analysis.energy_level) || 5));
+        analysis.genre = typeof analysis.genre === 'string' && analysis.genre.trim() ? analysis.genre.trim() : "Unknown";
+        analysis.mood = typeof analysis.mood === 'string' && analysis.mood.trim() ? analysis.mood.trim() : "Neutral";
+        
         return analysis;
         
     } catch (err) {
