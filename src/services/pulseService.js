@@ -22,7 +22,7 @@ let geminiModel = null;
 if (process.env.GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-flash",
       generationConfig: { responseMimeType: "application/json" },
       safetySettings: [
           { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
