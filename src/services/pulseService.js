@@ -46,6 +46,27 @@ async function keepAlive() {
 let lastTrackId = null;
 
 // 3. Neural Analysis (Gemini)
+async function fetchExistingAnalysis(trackName, artistName) {
+    try {
+        const { data } = await supabase
+            .from('shadow_events')
+            .select('data')
+            .eq('source', 'spotify')
+            .eq('event_type', 'track_played')
+            .eq('data->>track', trackName)
+            .eq('data->>artist', artistName)
+            .limit(20);
+            
+        if (data) {
+            const match = data.find(r => r.data && r.data.ai_analysis && r.data.ai_analysis.mood);
+            if (match) return match.data.ai_analysis;
+        }
+    } catch (e) {
+        console.warn(`[WARN] Could not fetch existing analysis: ${e.message}`);
+    }
+    return null;
+}
+
 async function analyzeTrack(track, artist, genres) {
     if (!geminiModel) return null;
     
@@ -156,7 +177,13 @@ async function checkPulse() {
 
         // E. AI Analysis (async, updates same row)
         if (geminiModel) {
-            const analysis = await analyzeTrack(trackName, artistName, genres);
+            let analysis = await fetchExistingAnalysis(trackName, artistName);
+            
+            if (analysis) {
+                console.log(`∿ [PULSE] Reused existing AI analysis for: ${trackName}`);
+            } else {
+                analysis = await analyzeTrack(trackName, artistName, genres);
+            }
             
             if (analysis) {
                 // First, find the row we just inserted
@@ -240,8 +267,16 @@ async function retryMissingAnalyses() {
                 const artistName = row.data.artist;
                 const genres = row.data.genres || [];
                 
-                console.log(`∿ [PULSE] Retrying analysis for: ${trackName} // ${artistName}`);
-                const analysis = await analyzeTrack(trackName, artistName, genres);
+                let analysis = await fetchExistingAnalysis(trackName, artistName);
+                let hitApi = false;
+                
+                if (analysis) {
+                    console.log(`∿ [PULSE] Reusing existing analysis for: ${trackName}`);
+                } else {
+                    console.log(`∿ [PULSE] Retrying AI analysis from API for: ${trackName} // ${artistName}`);
+                    analysis = await analyzeTrack(trackName, artistName, genres);
+                    hitApi = true;
+                }
                 
                 if (analysis) {
                     const updatedData = { ...row.data, ai_analysis: analysis };
@@ -252,8 +287,10 @@ async function retryMissingAnalyses() {
                     console.log(`∿ [PULSE] Successfully updated analysis for: ${trackName}`);
                 }
                 
-                // Sleep 4 seconds to respect rate limits
-                await new Promise(resolve => setTimeout(resolve, 4000));
+                // Sleep 4 seconds to respect rate limits ONLY if we hit the API
+                if (hitApi) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
             }
             console.log("∿ [PULSE] Background retry job completed.");
         } catch (err) {
