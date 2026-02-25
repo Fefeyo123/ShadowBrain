@@ -22,7 +22,7 @@ let geminiModel = null;
 if (process.env.GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-3-flash-preview",
       generationConfig: { responseMimeType: "application/json" },
       safetySettings: [
           { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -31,7 +31,7 @@ if (process.env.GEMINI_API_KEY) {
           { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
       ]
   });
-  console.log("∿ [PULSE] Neural Analysis ENABLED (Gemini 2.0 Flash JSON Mode)");
+  console.log("∿ [PULSE] Neural Analysis ENABLED (Gemini 3 Flash Preview JSON Mode)");
 } else {
   console.warn("∿ [PULSE] Neural Analysis DISABLED (No GEMINI_API_KEY)");
 }
@@ -288,8 +288,21 @@ async function retryMissingAnalyses() {
                     console.log(`∿ [PULSE] Reusing existing analysis for: ${trackName}`);
                 } else {
                     console.log(`∿ [PULSE] Retrying AI analysis from API for: ${trackName} // ${artistName}`);
-                    analysis = await analyzeTrack(trackName, artistName, genres);
-                    hitApi = true;
+                    
+                    // Backoff retry logic to handle 429 Too Many Requests
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        analysis = await analyzeTrack(trackName, artistName, genres);
+                        hitApi = true;
+                        
+                        // If successful, break out of the retry loop
+                        if (analysis) break;
+                        
+                        // If it failed (returned null) and we have attempts left, Wait 15s to let the API cooldown
+                        if (attempt < 3) {
+                            console.log(`∿ [PULSE] API hit limits or failed. Cooling down for 15s before attempt ${attempt + 1}...`);
+                            await new Promise(resolve => setTimeout(resolve, 15000));
+                        }
+                    }
                 }
                 
                 if (analysis) {
@@ -299,11 +312,13 @@ async function retryMissingAnalyses() {
                         .update({ data: updatedData })
                         .eq('id', row.id);
                     console.log(`∿ [PULSE] Successfully updated analysis for: ${trackName}`);
+                } else {
+                    console.log(`∿ [PULSE] Failed to analyze ${trackName} even after retries. Skipping.`);
                 }
                 
-                // Sleep 4 seconds to respect rate limits ONLY if we hit the API
+                // Sleep 5 seconds between API hits to safely stay under the 15 RPM free tier limit
                 if (hitApi) {
-                    await new Promise(resolve => setTimeout(resolve, 4000));
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
             }
             console.log("∿ [PULSE] Background retry job completed.");
