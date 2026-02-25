@@ -16,4 +16,7 @@ router.get('/history', pulseController.getHistory);
 // GET /v1/pulse/stats - Aggregated listening statistics
 router.get('/stats', pulseController.getStats);
 
+// POST /v1/pulse/retry-ai - Trigger missing AI analysis retries
+router.post('/retry-ai', pulseController.triggerRetry);
+
 module.exports = router;

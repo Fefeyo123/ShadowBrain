@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const SpotifyWebApi = require('spotify-web-api-node');
+const pulseService = require('../services/pulseService');
 
 /**
  * Pulse Controller
@@ -179,6 +180,7 @@ exports.getStats = async (req, res) => {
     const artistCounts = {};
     let totalEnergy = 0;
     let tracksWithAnalysis = 0;
+    let missingAnalysis = 0;
     let totalDuration = 0;
 
     tracks.forEach(t => {
@@ -186,7 +188,7 @@ exports.getStats = async (req, res) => {
       const ai = data.ai_analysis;
       
       // AI Analysis aggregation
-      if (ai) {
+      if (ai && ai.mood) {
         tracksWithAnalysis++;
         totalEnergy += ai.energy_level || 5;
         
@@ -199,6 +201,8 @@ exports.getStats = async (req, res) => {
         if (ai.genre) {
           aiGenreCounts[ai.genre] = (aiGenreCounts[ai.genre] || 0) + 1;
         }
+      } else {
+        missingAnalysis++;
       }
       
       // Artists
@@ -244,11 +248,26 @@ exports.getStats = async (req, res) => {
       dominant_mood: topMoods[0]?.name || null,
       top_moods: topMoods,
       top_ai_genres: topAiGenres,
-      top_artists: topArtists
+      top_artists: topArtists,
+      missing_analysis: missingAnalysis
     });
 
   } catch (err) {
     console.error('[PULSE] Stats Error:', err.message);
     res.status(500).json({ error: 'Failed to get pulse stats' });
+  }
+};
+
+/**
+ * POST /v1/pulse/retry-ai
+ * Triggers background process to retry missing AI analysis
+ */
+exports.triggerRetry = async (req, res) => {
+  try {
+    const result = await pulseService.retryMissingAnalyses();
+    res.json(result);
+  } catch (err) {
+    console.error('[PULSE] Trigger Retry Error:', err.message);
+    res.status(500).json({ error: 'Failed to trigger retry' });
   }
 };

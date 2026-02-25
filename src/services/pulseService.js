@@ -176,6 +176,74 @@ async function checkPulse() {
     }
 }
 
+let isRetrying = false;
+
+// 6. Retry System
+async function retryMissingAnalyses() {
+    if (isRetrying) {
+        console.log("∿ [PULSE] Retry job already running. Skipping.");
+        return { success: true, message: "Job already running", started: false };
+    }
+    
+    if (!geminiModel) {
+        console.warn("∿ [PULSE] Cannot retry: Gemini AI is disabled.");
+        return { success: false, message: "Gemini AI is disabled" };
+    }
+    
+    isRetrying = true;
+    console.log("∿ [PULSE] Starting background retry for missing AI analyses...");
+    
+    // Run in background instead of blocking the request
+    (async () => {
+        try {
+            // Fetch recent 200 tracks to find missing ones
+            const { data: rows, error } = await supabase
+                .from('shadow_events')
+                .select('id, data')
+                .eq('source', 'spotify')
+                .eq('event_type', 'track_played')
+                .order('timestamp', { ascending: false })
+                .limit(200);
+
+            if (error || !rows) {
+                console.error('[PULSE] Retry fetch error:', error?.message);
+                return;
+            }
+
+            const missing = rows.filter(r => !r.data.ai_analysis || !r.data.ai_analysis.mood);
+            console.log(`∿ [PULSE] Found ${missing.length} tracks missing analysis.`);
+
+            for (const row of missing) {
+                const trackName = row.data.track;
+                const artistName = row.data.artist;
+                const genres = row.data.genres || [];
+                
+                console.log(`∿ [PULSE] Retrying analysis for: ${trackName} // ${artistName}`);
+                const analysis = await analyzeTrack(trackName, artistName, genres);
+                
+                if (analysis) {
+                    const updatedData = { ...row.data, ai_analysis: analysis };
+                    await supabase
+                        .from('shadow_events')
+                        .update({ data: updatedData })
+                        .eq('id', row.id);
+                    console.log(`∿ [PULSE] Successfully updated analysis for: ${trackName}`);
+                }
+                
+                // Sleep 4 seconds to respect rate limits
+                await new Promise(resolve => setTimeout(resolve, 4000));
+            }
+            console.log("∿ [PULSE] Background retry job completed.");
+        } catch (err) {
+            console.error('[PULSE] Retry job error:', err.message);
+        } finally {
+            isRetrying = false;
+        }
+    })();
+    
+    return { success: true, message: "Retry job started", started: true };
+}
+
 // 5. Start Function
 function startPulseSensor() {
     console.log("∿∿∿ SHADOW PULSE ONLINE ∿∿∿");
@@ -188,4 +256,4 @@ function startPulseSensor() {
     });
 }
 
-module.exports = { startPulseSensor };
+module.exports = { startPulseSensor, retryMissingAnalyses };
