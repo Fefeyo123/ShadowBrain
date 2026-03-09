@@ -31,7 +31,7 @@ exports.getOverview = async (req, res) => {
         // Fetch metrics needed for Cardiac (Resting HR, HRV)
         const { data: metrics } = await supabase
             .from('view_health_metrics')
-            .select('type, value, unit')
+            .select('type, value, unit, timestamp')
             .gte('timestamp', oneDayAgo.toISOString())
             .in('type', ['resting_heart_rate', 'heart_rate_variability']);
 
@@ -41,11 +41,15 @@ exports.getOverview = async (req, res) => {
             .select('bpm, timestamp')
             .gte('timestamp', oneDayAgo.toISOString());
 
-        // Group metrics
+        // Group metrics (deduplicate by timestamp to handle duplicate batches)
         const grouped = {};
         for (const m of metrics || []) {
-            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit };
-            grouped[m.type].values.push(m.value);
+            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit, seen: new Set() };
+            const key = `${m.timestamp}`;
+            if (!grouped[m.type].seen.has(key)) {
+                grouped[m.type].seen.add(key);
+                grouped[m.type].values.push(m.value);
+            }
         }
 
         const hrs = (heartRates || []).map(h => h.bpm).filter(Boolean);
@@ -95,19 +99,21 @@ exports.ingestMetrics = async (req, res) => {
         for (const metric of metrics) {
             const eventType = metric.name || 'unknown_metric';
 
-            if (eventType === 'sleep_analysis' && metric.data && metric.data.length > 0) {
-                const { data: recentSleeps } = await supabase
+            // Deduplication: merge into existing batch if one exists within the last 16 hours
+            // This prevents inflated values when Apple Health Auto Export sends the same readings multiple times
+            if (metric.data && metric.data.length > 0) {
+                const { data: recentEvents } = await supabase
                     .from('shadow_events')
                     .select('id, data, timestamp')
-                    .eq('event_type', 'sleep_analysis')
+                    .eq('event_type', eventType)
                     .order('timestamp', { ascending: false })
                     .limit(1);
 
                 let matchId = null;
                 let existingRow = null;
 
-                if (recentSleeps && recentSleeps.length > 0) {
-                    const row = recentSleeps[0];
+                if (recentEvents && recentEvents.length > 0) {
+                    const row = recentEvents[0];
                     const rowTime = new Date(row.timestamp).getTime();
                     const hoursDiff = (new Date().getTime() - rowTime) / (1000 * 60 * 60);
                     
@@ -122,6 +128,7 @@ exports.ingestMetrics = async (req, res) => {
                     const newDataPoints = metric.data || [];
                     const mergedMap = new Map();
                     
+                    // Use date/startDate as dedup key — newer data overwrites older for same timestamp
                     oldDataPoints.forEach(p => mergedMap.set(p.date || p.startDate, p));
                     newDataPoints.forEach(p => mergedMap.set(p.date || p.startDate, p));
 
@@ -129,7 +136,7 @@ exports.ingestMetrics = async (req, res) => {
                     mergedData.sort((a, b) => new Date(a.date || a.startDate) - new Date(b.date || b.startDate));
                     metric.data = mergedData;
 
-                    console.log(`♡ [VITAL] Updating Sleep Timeline (ID: ${matchId}) - Merged ${newDataPoints.length} segments.`);
+                    console.log(`♡ [VITAL] Merging ${eventType} (ID: ${matchId}) - ${newDataPoints.length} readings into ${mergedData.length} total.`);
                     
                     await supabase
                         .from('shadow_events')

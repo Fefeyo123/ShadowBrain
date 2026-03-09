@@ -13,7 +13,7 @@ exports.getOverview = async (req, res) => {
         // Fetch metrics
         const { data: metrics } = await supabase
             .from('view_health_metrics')
-            .select('type, value, unit')
+            .select('type, value, unit, timestamp')
             .gte('timestamp', oneDayAgo.toISOString())
             .in('type', [
                 'step_count', 'distance_walking_running', 'flights_climbed'
@@ -22,8 +22,13 @@ exports.getOverview = async (req, res) => {
         // Group metrics
         const grouped = {};
         for (const m of metrics || []) {
-            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit };
-            grouped[m.type].values.push(m.value);
+            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit, seen: new Set() };
+            // Deduplicate: same timestamp = same reading from a duplicate batch
+            const key = `${m.timestamp}`;
+            if (!grouped[m.type].seen.has(key)) {
+                grouped[m.type].seen.add(key);
+                grouped[m.type].values.push(m.value);
+            }
         }
 
         const activityGroup = {

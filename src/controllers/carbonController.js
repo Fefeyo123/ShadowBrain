@@ -13,18 +13,22 @@ exports.getOverview = async (req, res) => {
         // Fetch metrics
         const { data: metrics } = await supabase
             .from('view_health_metrics')
-            .select('type, value, unit')
+            .select('type, value, unit, timestamp')
             .gte('timestamp', oneDayAgo.toISOString())
             .in('type', [
                 'active_energy', 'basal_energy_burned', 
                 'body_mass', 'body_mass_index', 'body_fat_percentage'
             ]);
 
-        // Group metrics
+        // Group metrics (deduplicate by timestamp to handle duplicate batches)
         const grouped = {};
         for (const m of metrics || []) {
-            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit };
-            grouped[m.type].values.push(m.value);
+            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit, seen: new Set() };
+            const key = `${m.timestamp}`;
+            if (!grouped[m.type].seen.has(key)) {
+                grouped[m.type].seen.add(key);
+                grouped[m.type].values.push(m.value);
+            }
         }
 
         const energyGroup = {
