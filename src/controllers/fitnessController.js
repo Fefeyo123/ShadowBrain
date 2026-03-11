@@ -7,14 +7,14 @@ const { sumArray, avgArray } = require('../utils/mathUtils');
  */
 exports.getOverview = async (req, res) => {
     try {
-        const oneDayAgo = new Date();
-        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
 
         // Fetch metrics
         const { data: metrics } = await supabase
             .from('view_health_metrics')
             .select('type, value, unit, timestamp')
-            .gte('timestamp', oneDayAgo.toISOString())
+            .gte('timestamp', startOfDay.toISOString())
             .in('type', [
                 'step_count', 'distance_walking_running', 'flights_climbed'
             ]);

@@ -25,21 +25,21 @@ exports.getPulse = (req, res) => {
  */
 exports.getOverview = async (req, res) => {
     try {
-        const oneDayAgo = new Date();
-        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
 
         // Fetch metrics needed for Cardiac (Resting HR, HRV)
         const { data: metrics } = await supabase
             .from('view_health_metrics')
             .select('type, value, unit, timestamp')
-            .gte('timestamp', oneDayAgo.toISOString())
+            .gte('timestamp', startOfDay.toISOString())
             .in('type', ['resting_heart_rate', 'heart_rate_variability']);
 
         // Fetch heart rate
         const { data: heartRates } = await supabase
             .from('view_heart_rate')
             .select('bpm, timestamp')
-            .gte('timestamp', oneDayAgo.toISOString());
+            .gte('timestamp', startOfDay.toISOString());
 
         // Group metrics (deduplicate by timestamp to handle duplicate batches)
         const grouped = {};
