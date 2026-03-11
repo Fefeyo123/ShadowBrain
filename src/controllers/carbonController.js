@@ -10,26 +10,34 @@ exports.getOverview = async (req, res) => {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
-        // Fetch metrics
-        const { data: metrics } = await supabase
+        const { data: metrics, error } = await supabase
             .from('view_health_metrics')
-            .select('type, value, unit, timestamp')
+            .select('type, value, timestamp')
             .gte('timestamp', startOfDay.toISOString())
             .in('type', [
                 'active_energy', 'basal_energy_burned', 
                 'body_mass', 'body_mass_index', 'body_fat_percentage'
             ]);
 
-        // Group metrics (deduplicate by timestamp to handle duplicate batches)
-        const grouped = {};
-        for (const m of metrics || []) {
-            if (!grouped[m.type]) grouped[m.type] = { values: [], unit: m.unit, seen: new Set() };
-            const key = `${m.timestamp}`;
-            if (!grouped[m.type].seen.has(key)) {
-                grouped[m.type].seen.add(key);
-                grouped[m.type].values.push(m.value);
+        if (error) throw error;
+
+        const grouped = (metrics || []).reduce((acc, { type, value, timestamp }) => {
+            if (!acc[type]) {
+                acc[type] = { values: [], seen: new Set() };
             }
-        }
+            if (!acc[type].seen.has(timestamp)) {
+                acc[type].seen.add(timestamp);
+                acc[type].values.push(value);
+            }
+            return acc;
+        }, {});
+
+        const getValues = (type) => grouped[type]?.values || [];
+        const getSum = (type) => Math.round(sumArray(getValues(type)));
+        const getAvg = (type) => Math.round(avgArray(getValues(type)) * 10) / 10;
+
+        const activeKcal = getSum('active_energy');
+        const basalKcal = getSum('basal_energy_burned');
 
         const energyGroup = {
             id: 'energy',
@@ -37,9 +45,9 @@ exports.getOverview = async (req, res) => {
             icon: 'local_fire_department',
             color: 'orange',
             metrics: [
-                { key: 'active', label: 'Active', value: Math.round(sumArray(grouped.active_energy?.values)), unit: 'kcal' },
-                { key: 'basal', label: 'Basal', value: Math.round(sumArray(grouped.basal_energy_burned?.values)), unit: 'kcal' },
-                { key: 'total', label: 'Total', value: Math.round(sumArray(grouped.active_energy?.values) + sumArray(grouped.basal_energy_burned?.values)), unit: 'kcal' },
+                { key: 'active', label: 'Active', value: activeKcal, unit: 'kcal' },
+                { key: 'basal', label: 'Basal', value: basalKcal, unit: 'kcal' },
+                { key: 'total', label: 'Total', value: activeKcal + basalKcal, unit: 'kcal' },
             ]
         };
 
@@ -49,9 +57,9 @@ exports.getOverview = async (req, res) => {
             icon: 'accessibility_new',
             color: 'cyan',
             metrics: [
-                { key: 'weight', label: 'Weight', value: Math.round(avgArray(grouped.body_mass?.values) * 10) / 10, unit: 'kg' },
-                { key: 'bmi', label: 'BMI', value: Math.round(avgArray(grouped.body_mass_index?.values) * 10) / 10, unit: '' },
-                { key: 'body_fat', label: 'Body Fat', value: Math.round(avgArray(grouped.body_fat_percentage?.values) * 10) / 10, unit: '%' },
+                { key: 'weight', label: 'Weight', value: getAvg('body_mass'), unit: 'kg' },
+                { key: 'bmi', label: 'BMI', value: getAvg('body_mass_index'), unit: '' },
+                { key: 'body_fat', label: 'Body Fat', value: getAvg('body_fat_percentage'), unit: '%' },
             ]
         };
 
@@ -59,6 +67,7 @@ exports.getOverview = async (req, res) => {
             groups: [energyGroup, bodyGroup],
             updated_at: new Date().toISOString()
         });
+
     } catch (err) {
         console.error('[ERROR] Get Carbon Overview:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });

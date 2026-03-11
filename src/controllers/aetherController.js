@@ -1,6 +1,9 @@
 const supabase = require('../config/supabase');
 const { pivotArrays } = require('../utils/dataUtils');
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_MS = 24 * ONE_HOUR_MS;
+
 exports.getForecast = async (req, res) => {
     try {
         const { data: row, error } = await supabase
@@ -10,8 +13,7 @@ exports.getForecast = async (req, res) => {
             .single();
 
         if (error || !row) {
-            console.warn('[AETHER] ⚠️ No weather data found in DB.');
-            // Return empty structure rather than 404 to prevent frontend crashes
+            console.warn('[AETHER] Geen weerdata gevonden in de DB.');
             return res.json({ 
                 meta: {}, 
                 current: null, 
@@ -20,59 +22,47 @@ exports.getForecast = async (req, res) => {
             });
         }
 
-        const raw = row.data; // The JSONB payload
-
+        const { data: raw, location, updated_at } = row;
         const now = new Date();
+        const nowTime = now.getTime();
 
-        // 1. Transform Daily
-        // OpenMeteo usually gives 7 days. We just pivot it.
-        const daily = pivotArrays(raw.daily);
+        const daily = pivotArrays(raw.daily || {});
 
-        // 2. Transform Hourly & Filter for Next 24h
-        // OpenMeteo OneCall (or standard) often gives 7 days hourly (168 hours).
-        // We only want [Now -> Now + 24h]
-        let hourly = pivotArrays(raw.hourly);
-        
-        // Filter: Keep items where time is future (or very recent past) and within 24h
-        // We accept items from "1 hour ago" to ensure the graph allows starts nicely connected
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(nowTime - ONE_HOUR_MS);
+        const twentyFourHoursFromNow = new Date(nowTime + TWENTY_FOUR_HOURS_MS);
 
-        hourly = hourly.filter(h => {
-            const t = new Date(h.time);
-            return t >= oneHourAgo && t <= twentyFourHoursFromNow;
+        const hourly = pivotArrays(raw.hourly || []).filter(h => {
+            const time = new Date(h.time);
+            return time >= oneHourAgo && time <= twentyFourHoursFromNow;
         });
 
-        // Enrichment: Add missing fields to 'current' from the closest 'hourly' data point
-        // match by closest hour
-        const currentHourStr = now.toISOString().slice(0, 13); // "2023-10-27T10"
+        const currentHourStr = now.toISOString().slice(0, 13); 
         const currentHourData = hourly.find(h => h.time.startsWith(currentHourStr)) || hourly[0];
 
+        const current = { ...raw.current };
+
         if (currentHourData) {
-            if (raw.current.uv_index === undefined) raw.current.uv_index = currentHourData.uv_index;
-            if (raw.current.visibility === undefined) raw.current.visibility = currentHourData.visibility;
-            if (raw.current.precipitation_probability === undefined) raw.current.precipitation_probability = currentHourData.precipitation_probability;
-            // Ensure pressure is available if not already
-            if (raw.current.pressure_msl === undefined) raw.current.pressure_msl = currentHourData.pressure_msl || raw.current.surface_pressure;
+            current.uv_index ??= currentHourData.uv_index;
+            current.visibility ??= currentHourData.visibility;
+            current.precipitation_probability ??= currentHourData.precipitation_probability;
+            current.pressure_msl ??= (currentHourData.pressure_msl || current.surface_pressure);
         }
 
-        // Response Assembly
-        const response = {
+        // 5. Bouw en verstuur de response
+        return res.json({
             meta: {
-                ...raw.meta,
-                lat: row.location?.lat,
-                lon: row.location?.lon,
-                updated_at: row.updated_at
+                ...(raw.meta || {}),
+                lat: location?.lat,
+                lon: location?.lon,
+                updated_at
             },
-            current: raw.current,
-            daily: daily,
-            hourly: hourly
-        };
-
-        res.json(response);
+            current,
+            daily,
+            hourly
+        });
 
     } catch (err) {
-        console.error('[AETHER] ❌ API Error:', err.message);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('[AETHER] API Error:', err.message);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };

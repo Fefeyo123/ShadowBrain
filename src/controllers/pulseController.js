@@ -4,122 +4,107 @@ const pulseService = require('../services/pulseService');
 
 /**
  * Pulse Controller
- * Handles Spotify listening data - the rhythm of the system.
+ * Manages Spotify rhythm data and AI-driven listening insights.
  */
 
-// Spotify API instance (shares config with pulseService)
 const spotifyApi = new SpotifyWebApi({
   clientId: process.env.SPOTIFY_CLIENT_ID,
   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
   refreshToken: process.env.SPOTIFY_REFRESH_TOKEN
 });
 
-// Helper: Ensure fresh token
-async function ensureToken() {
+/**
+ * Helper: Refreshes and sets the Spotify access token
+ */
+async function refreshSpotifyToken() {
   try {
     const data = await spotifyApi.refreshAccessToken();
     spotifyApi.setAccessToken(data.body['access_token']);
   } catch (err) {
     console.error('[PULSE] Token refresh failed:', err.message);
-    throw err;
+    throw new Error('Spotify authentication failed');
   }
 }
 
 /**
  * GET /v1/pulse/status
- * Returns current playing track or last played from DB
+ * Provides the currently playing track or the most recent track from history.
  */
 exports.getStatus = async (req, res) => {
   try {
-    await ensureToken();
-    
-    // Try to get currently playing
+    await refreshSpotifyToken();
     const nowPlaying = await spotifyApi.getMyCurrentPlayingTrack();
     
-    if (nowPlaying.body && nowPlaying.body.item && nowPlaying.body.is_playing) {
+    // 1. Handle Active Session
+    if (nowPlaying.body?.item && nowPlaying.body.is_playing) {
       const track = nowPlaying.body.item;
       const trackName = track.name;
-      const artistName = track.artists.map(a => a.name).join(', ');
-      
-      // Try to get AI analysis from DB for this specific track
-      // Search in the JSONB data field for matching track name
-      const { data: dbTrack } = await supabase
+
+      // Look for existing AI analysis in the most recent events
+      const { data: recentEvents } = await supabase
         .from('shadow_events')
         .select('data')
         .eq('source', 'spotify')
         .eq('event_type', 'track_played')
         .order('timestamp', { ascending: false })
-        .limit(5);
-      
-      // Find matching track in recent entries
-      let aiAnalysis = null;
-      if (dbTrack && dbTrack.length > 0) {
-        const match = dbTrack.find(t => t.data?.track === trackName);
-        aiAnalysis = match?.data?.ai_analysis || null;
-      }
-      
+        .limit(10);
+
+      const analysisMatch = recentEvents?.find(e => e.data?.track === trackName);
+
       return res.json({
+        success: true,
         is_playing: true,
         track: trackName,
-        artist: artistName,
+        artist: track.artists.map(a => a.name).join(', '),
         album: track.album.name,
         album_art: track.album.images[0]?.url || null,
         duration_ms: track.duration_ms,
         progress_ms: nowPlaying.body.progress_ms,
-        ai_analysis: aiAnalysis,
+        ai_analysis: analysisMatch?.data?.ai_analysis || null,
         timestamp: new Date().toISOString()
       });
     }
 
-    // Fallback: Get last played from database
-    const { data: lastTrack } = await supabase
+    // 2. Fallback: Get Last Played from Database
+    const { data: lastTrack, error } = await supabase
       .from('shadow_events')
       .select('data, timestamp')
       .eq('source', 'spotify')
       .eq('event_type', 'track_played')
       .order('timestamp', { ascending: false })
-      .limit(1);
+      .limit(1)
+      .single();
 
-    if (lastTrack && lastTrack.length > 0) {
-      const event = lastTrack[0];
+    if (lastTrack) {
       return res.json({
+        success: true,
         is_playing: false,
-        track: event.data.track,
-        artist: event.data.artist,
-        album: event.data.album,
-        album_art: event.data.album_art || null,
-        duration_ms: event.data.duration_ms,
-        progress_ms: null,
-        ai_analysis: event.data.ai_analysis || null,
-        timestamp: event.timestamp
+        track: lastTrack.data.track,
+        artist: lastTrack.data.artist,
+        album: lastTrack.data.album,
+        album_art: lastTrack.data.album_art || null,
+        ai_analysis: lastTrack.data.ai_analysis || null,
+        timestamp: lastTrack.timestamp
       });
     }
 
-    // No data at all
-    res.json({
-      is_playing: false,
-      track: null,
-      artist: null,
-      album: null,
-      ai_analysis: null,
-      timestamp: null
-    });
+    res.json({ success: true, is_playing: false, track: null });
 
   } catch (err) {
     console.error('[PULSE] Status Error:', err.message);
-    res.status(500).json({ error: 'Failed to get pulse status' });
+    res.status(500).json({ success: false, error: 'Failed to retrieve pulse status' });
   }
 };
 
 /**
  * GET /v1/pulse/history
- * Returns recent track play events with AI analysis
+ * Retrieves a list of recent listening events.
  */
 exports.getHistory = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
     
-    const { data: tracks, error } = await supabase
+    const { data, error } = await supabase
       .from('shadow_events')
       .select('data, timestamp')
       .eq('source', 'spotify')
@@ -129,31 +114,28 @@ exports.getHistory = async (req, res) => {
 
     if (error) throw error;
 
-    const history = (tracks || []).map(t => ({
-      track: t.data.track,
-      artist: t.data.artist,
-      album: t.data.album,
-      genres: t.data.genres || [],
-      duration_ms: t.data.duration_ms,
-      ai_analysis: t.data.ai_analysis || null,
-      timestamp: t.timestamp
+    const history = data.map(item => ({
+      track: item.data.track,
+      artist: item.data.artist,
+      album: item.data.album,
+      genres: item.data.genres || [],
+      ai_analysis: item.data.ai_analysis || null,
+      timestamp: item.timestamp
     }));
 
-    res.json({ data: history });
-
+    res.json({ success: true, count: history.length, data: history });
   } catch (err) {
     console.error('[PULSE] History Error:', err.message);
-    res.status(500).json({ error: 'Failed to get pulse history' });
+    res.status(500).json({ success: false, error: 'Failed to retrieve history' });
   }
 };
 
 /**
  * GET /v1/pulse/stats
- * Returns aggregated listening statistics with AI insights
+ * Aggregates listening data from the past 7 days.
  */
 exports.getStats = async (req, res) => {
   try {
-    // Get all tracks from last 7 days
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
 
@@ -162,112 +144,75 @@ exports.getStats = async (req, res) => {
       .select('data, timestamp')
       .eq('source', 'spotify')
       .eq('event_type', 'track_played')
-      .gte('timestamp', weekAgo.toISOString())
-      .order('timestamp', { ascending: false });
+      .gte('timestamp', weekAgo.toISOString());
 
     if (error) throw error;
 
-    const tracks = weeklyTracks || [];
+    const today = new Date().setHours(0, 0, 0, 0);
     
-    // Today's tracks
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTracks = tracks.filter(t => new Date(t.timestamp) >= today);
-
-    // Aggregations
-    const moodCounts = {};
-    const aiGenreCounts = {};
-    const artistCounts = {};
-    let totalEnergy = 0;
-    let tracksWithAnalysis = 0;
-    let missingAnalysis = 0;
-    let totalDuration = 0;
-
-    tracks.forEach(t => {
-      const data = t.data;
+    const stats = (weeklyTracks || []).reduce((acc, curr) => {
+      const { data, timestamp } = curr;
       const ai = data.ai_analysis;
-      
-      // AI Analysis aggregation
-      if (ai && ai.mood) {
-        tracksWithAnalysis++;
-        totalEnergy += ai.energy_level || 5;
-        
-        // Mood counts
-        if (ai.mood) {
-          moodCounts[ai.mood] = (moodCounts[ai.mood] || 0) + 1;
-        }
-        
-        // AI Genre counts
-        if (ai.genre) {
-          aiGenreCounts[ai.genre] = (aiGenreCounts[ai.genre] || 0) + 1;
-        }
+      const isToday = new Date(timestamp) >= today;
+
+      if (isToday) acc.todayCount++;
+      acc.totalDuration += data.duration_ms || 0;
+
+      // Aggregate Artists
+      const primaryArtist = data.artist?.split(', ')[0] || 'Unknown';
+      acc.artists[primaryArtist] = (acc.artists[primaryArtist] || 0) + 1;
+
+      // Aggregate AI Insights
+      if (ai?.mood) {
+        acc.moods[ai.mood] = (acc.moods[ai.mood] || 0) + 1;
+        acc.genres[ai.genre] = (acc.genres[ai.genre] || 0) + 1;
+        acc.energySum += ai.energy_level || 5;
+        acc.analyzedCount++;
       } else {
-        missingAnalysis++;
+        acc.missingAnalysis++;
       }
-      
-      // Artists
-      const artist = data.artist?.split(', ')[0] || 'Unknown';
-      artistCounts[artist] = (artistCounts[artist] || 0) + 1;
-      
-      // Duration
-      totalDuration += data.duration_ms || 0;
+
+      return acc;
+    }, { 
+      todayCount: 0, totalDuration: 0, energySum: 0, analyzedCount: 0, 
+      missingAnalysis: 0, artists: {}, moods: {}, genres: {} 
     });
 
-    // Sort and get top moods
-    const topMoods = Object.entries(moodCounts)
+    // Helper to sort and slice top maps
+    const getTop = (map, limit = 5) => Object.entries(map)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
+      .slice(0, limit)
       .map(([name, count]) => ({ name, count }));
-
-    // Sort and get top AI genres
-    const topAiGenres = Object.entries(aiGenreCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
-
-    // Sort and get top 5 artists
-    const topArtists = Object.entries(artistCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
-
-    // Average energy
-    const avgEnergy = tracksWithAnalysis > 0 
-      ? (totalEnergy / tracksWithAnalysis).toFixed(1) 
-      : null;
-
-    // Total listening time
-    const totalMinutes = Math.round(totalDuration / 60000);
-    const weeklyHours = (totalMinutes / 60).toFixed(1);
 
     res.json({
-      tracks_today: todayTracks.length,
-      tracks_weekly: tracks.length,
-      weekly_hours: parseFloat(weeklyHours),
-      avg_energy: avgEnergy ? parseFloat(avgEnergy) : null,
-      dominant_mood: topMoods[0]?.name || null,
-      top_moods: topMoods,
-      top_ai_genres: topAiGenres,
-      top_artists: topArtists,
-      missing_analysis: missingAnalysis
+      success: true,
+      tracks_today: stats.todayCount,
+      tracks_weekly: weeklyTracks.length,
+      weekly_hours: parseFloat((stats.totalDuration / 3600000).toFixed(1)),
+      avg_energy: stats.analyzedCount > 0 ? parseFloat((stats.energySum / stats.analyzedCount).toFixed(1)) : null,
+      dominant_mood: getTop(stats.moods, 1)[0]?.name || null,
+      top_moods: getTop(stats.moods),
+      top_ai_genres: getTop(stats.genres),
+      top_artists: getTop(stats.artists),
+      missing_analysis: stats.missingAnalysis
     });
 
   } catch (err) {
     console.error('[PULSE] Stats Error:', err.message);
-    res.status(500).json({ error: 'Failed to get pulse stats' });
+    res.status(500).json({ success: false, error: 'Failed to generate statistics' });
   }
 };
 
 /**
  * POST /v1/pulse/retry-ai
- * Triggers background process to retry missing AI analysis
+ * Manual trigger for the background AI analysis retry job.
  */
 exports.triggerRetry = async (req, res) => {
   try {
     const result = await pulseService.retryMissingAnalyses();
-    res.json(result);
+    res.json({ success: true, ...result });
   } catch (err) {
-    console.error('[PULSE] Trigger Retry Error:', err.message);
-    res.status(500).json({ error: 'Failed to trigger retry' });
+    console.error('[PULSE] Retry Trigger Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to start retry process' });
   }
 };

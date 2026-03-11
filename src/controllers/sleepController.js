@@ -7,116 +7,113 @@ const { sumArray, avgArray } = require('../utils/mathUtils');
  */
 exports.getOverview = async (req, res) => {
     try {
-        const oneDayAgo = new Date();
-        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-        // Fetch sleep data
-        const { data: sleepData } = await supabase
-            .from('view_sleep_timeline')
-            .select('*')
-            .gte('start_time', oneDayAgo.toISOString())
-            .order('start_time', { ascending: true }); // Ordered for timeline
+        // 1. Concurrent Data Fetching
+        // Fetching all necessary data in parallel to reduce latency.
+        const [sleepDataResponse, metricsResponse, heartRateResponse] = await Promise.all([
+            supabase.from('view_sleep_timeline').select('*').gte('start_time', oneDayAgo).order('start_time', { ascending: true }),
+            supabase.from('view_health_metrics').select('type, value, unit, timestamp').gte('timestamp', oneDayAgo)
+                .in('type', ['respiratory_rate', 'blood_oxygen_saturation', 'blood_oxygen', 'apple_sleeping_wrist_temperature', 'body_temperature']),
+            supabase.from('view_heart_rate').select('bpm, timestamp').gte('timestamp', oneDayAgo)
+        ]);
 
-        // Fetch related metrics for Sleep Window calculations
-        // We need: heart_rate, respiratory_rate, blood_oxygen, wrist_temp
-        // Optimization: Fetch all needed metrics in one go if possible, or parallel
-        const { data: metrics } = await supabase
-            .from('view_health_metrics')
-            .select('type, value, unit, timestamp')
-            .gte('timestamp', oneDayAgo.toISOString())
-            .in('type', ['respiratory_rate', 'blood_oxygen_saturation', 'blood_oxygen', 'apple_sleeping_wrist_temperature', 'body_temperature']);
+        const sleepData = sleepDataResponse.data || [];
+        const metrics = metricsResponse.data || [];
+        const heartRates = heartRateResponse.data || [];
 
-        const { data: heartRates } = await supabase
-            .from('view_heart_rate')
-            .select('bpm, timestamp')
-            .gte('timestamp', oneDayAgo.toISOString());
-
-        // --- Calculate Sleep Metrics ---
-        let sleepTotal = 0, deep = 0, rem = 0, core = 0, awake = 0;
-        for (const s of sleepData || []) {
+        // 2. Phase Summarization
+        // Use reduce to aggregate hours per sleep phase.
+        const phases = sleepData.reduce((acc, s) => {
             const phase = (s.phase || '').toLowerCase();
-            const hrs = s.duration_hours || 0;
-            if (phase.includes('deep')) deep += hrs;
-            else if (phase.includes('rem')) rem += hrs;
-            else if (phase.includes('core')) core += hrs;
-            else if (phase.includes('awake')) awake += hrs;
-        }
-        sleepTotal = deep + rem + core;
+            const duration = s.duration_hours || 0;
+            if (phase.includes('deep')) acc.deep += duration;
+            else if (phase.includes('rem')) acc.rem += duration;
+            else if (phase.includes('core')) acc.core += duration;
+            else if (phase.includes('awake')) acc.awake += duration;
+            return acc;
+        }, { deep: 0, rem: 0, core: 0, awake: 0 });
 
-        // Detect Sleep Window (last main sleep session)
+        const sleepTotal = phases.deep + phases.rem + phases.core;
+
+        // 3. Sleep Window Detection
+        // Identifies the start and end of the entire sleep session.
         let sleepStart = null, sleepEnd = null;
-        if (sleepData && sleepData.length > 0) {
-             const timestamps = sleepData.map(s => [new Date(s.start_time).getTime(), new Date(s.end_time).getTime()]).flat();
-             sleepStart = Math.min(...timestamps);
-             sleepEnd = Math.max(...timestamps);
+        if (sleepData.length > 0) {
+            const times = sleepData.flatMap(s => [new Date(s.start_time).getTime(), new Date(s.end_time).getTime()]);
+            sleepStart = Math.min(...times);
+            sleepEnd = Math.max(...times);
         }
 
-        // Helper for windowed average
-        const getAvgInWindow = (metricType, fallbackType, relaxedWindow = false) => {
-             if (!sleepStart || !sleepEnd) return 0;
-             const searchStart = relaxedWindow ? sleepStart - (6 * 60 * 60 * 1000) : sleepStart;
-             
-             const values = (metrics || [])
-                .filter(m => (m.type === metricType || m.type === fallbackType))
+        // 4. Metric Aggregation Helper
+        // Filters metrics that fall within the specific sleep window.
+        const getWindowedAvg = (types, isRelaxed = false) => {
+            if (!sleepStart || !sleepEnd) return 0;
+            const searchStart = isRelaxed ? sleepStart - (6 * 60 * 60 * 1000) : sleepStart;
+            
+            const values = metrics
+                .filter(m => types.includes(m.type))
                 .filter(m => {
                     const t = new Date(m.timestamp).getTime();
                     return t >= searchStart && t <= sleepEnd;
                 })
                 .map(m => m.value);
-             return avgArray(values);
+            return avgArray(values);
         };
 
-        const sleepHr = (heartRates || [])
+        const sleepHrValues = heartRates
             .filter(h => {
                 const t = new Date(h.timestamp).getTime();
                 return sleepStart && sleepEnd && t >= sleepStart && t <= sleepEnd;
             })
             .map(h => h.bpm);
 
+        // 5. Build Response Object
+        // Matches the frontend expectation for the 'sleep' group structure.
         const group = {
             id: 'sleep',
             label: 'Sleep',
             icon: 'bedtime',
             color: 'violet',
             metrics: [
-                { key: 'total', label: 'Total', value: Math.round(sleepTotal * 100) / 100, unit: 'hrs' },
-                { key: 'deep', label: 'Deep', value: Math.round(deep * 100) / 100, unit: 'hrs' },
-                { key: 'rem', label: 'REM', value: Math.round(rem * 100) / 100, unit: 'hrs' },
-                { key: 'core', label: 'Core', value: Math.round(core * 100) / 100, unit: 'hrs' },
+                { key: 'total', label: 'Total', value: Number(sleepTotal.toFixed(2)), unit: 'hrs' },
+                { key: 'deep', label: 'Deep', value: Number(phases.deep.toFixed(2)), unit: 'hrs' },
+                { key: 'rem', label: 'REM', value: Number(phases.rem.toFixed(2)), unit: 'hrs' },
+                { key: 'core', label: 'Core', value: Number(phases.core.toFixed(2)), unit: 'hrs' },
             ],
             related: [
-                { key: 'sleep_hr', label: 'Sleep HR', value: Math.round(avgArray(sleepHr)), unit: 'bpm' },
-                { key: 'respiratory', label: 'Respiratory', value: Math.round(getAvgInWindow('respiratory_rate') * 10) / 10, unit: '/min' },
-                { key: 'oxygen', label: 'O₂ Sat', value: Math.round(getAvgInWindow('blood_oxygen_saturation', 'blood_oxygen') * 100) / 100, unit: '%' },
-                { key: 'wrist_temp', label: 'Wrist Temp', value: Math.round(getAvgInWindow('apple_sleeping_wrist_temperature', 'body_temperature', true) * 10) / 10, unit: '°C' },
+                { key: 'sleep_hr', label: 'Sleep HR', value: Math.round(avgArray(sleepHrValues)), unit: 'bpm' },
+                { key: 'respiratory', label: 'Respiratory', value: Number(getWindowedAvg(['respiratory_rate']).toFixed(1)), unit: '/min' },
+                { key: 'oxygen', label: 'O₂ Sat', value: Number(getWindowedAvg(['blood_oxygen_saturation', 'blood_oxygen']).toFixed(2)), unit: '%' },
+                { key: 'wrist_temp', label: 'Wrist Temp', value: Number(getWindowedAvg(['apple_sleeping_wrist_temperature', 'body_temperature'], true).toFixed(1)), unit: '°C' },
             ]
         };
 
-        // Determine Quality
-        const totalDuration = sleepTotal + awake;
+        // 6. Quality Scoring
+        // Determines quality based on efficiency and restorative sleep percentages.
+        const totalInBed = sleepTotal + phases.awake;
         let quality = 'No Data';
         if (sleepTotal > 0) {
-            const efficiency = totalDuration > 0 ? (sleepTotal / totalDuration) : 0;
-            const restorativePercent = ((deep + rem) / sleepTotal) * 100;
+            const efficiency = totalInBed > 0 ? (sleepTotal / totalInBed) : 0;
+            const restorative = ((phases.deep + phases.rem) / sleepTotal);
             
             if (efficiency < 0.85) {
-                if (restorativePercent >= 35) quality = 'Fair';
-                else quality = 'Poor';
+                quality = restorative >= 0.35 ? 'Fair' : 'Poor';
             } else {
-                if (restorativePercent >= 40) quality = 'Excellent';
-                else if (restorativePercent >= 25) quality = 'Good';
+                if (restorative >= 0.40) quality = 'Excellent';
+                else if (restorative >= 0.25) quality = 'Good';
                 else quality = 'Fair';
             }
         }
 
         res.json({
             group,
-            timeline: sleepData || [],
+            timeline: sleepData,
             quality,
             updated_at: new Date().toISOString()
         });
     } catch (err) {
-        console.error('[ERROR] Get Somnus Overview:', err.message);
+        console.error('[ERROR] Sleep Overview:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
@@ -127,15 +124,16 @@ exports.getOverview = async (req, res) => {
  */
 exports.getHistory = async (req, res) => {
     try {
-        const { data: sleepData } = await supabase
+        const { data, error } = await supabase
             .from('view_sleep_daily')
             .select('sleep_date, total_hours, rem_hours, deep_hours, core_hours')
             .order('sleep_date', { ascending: false })
-            .limit(14); // 2 weeks
+            .limit(14);
 
-        res.json({ history: sleepData || [] });
+        if (error) throw error;
+        res.json({ history: data || [] });
     } catch (err) {
-        console.error('[ERROR] Get Somnus History:', err.message);
+        console.error('[ERROR] Sleep History:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };

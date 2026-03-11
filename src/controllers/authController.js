@@ -98,8 +98,8 @@ exports.login = (req, res) => {
             const isProduction = process.env.NODE_ENV === 'production';
             res.cookie('auth_token', token, {
                 httpOnly: true,
-                secure: isProduction, // MOET true zijn op Render (HTTPS)
-                sameSite: isProduction ? 'none' : 'lax', // MOET 'none' zijn omdat Vercel en Render andere domeinen zijn
+                secure: isProduction,
+                sameSite: isProduction ? 'none' : 'lax',
                 path: '/',
                 maxAge: 7 * 24 * 60 * 60 * 1000
             });
