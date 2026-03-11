@@ -1,27 +1,39 @@
-/**
- * Middleware to protect API routes with a simple API Key.
- * Clients must send 'x-shadow-key' header matching 'SHADOW_KEY' env var.
- */
+const jwt = require('jsonwebtoken');
+
 module.exports = (req, res, next) => {
     const apiKey = req.headers['x-shadow-key'];
     const validKey = process.env.SHADOW_KEY;
 
-    // Exempt specific routes from Auth
-    // We check req.originalUrl because this middleware is mounted at '/api', so req.path might be relative.
+    // 1. Exempt specific ingest routes
     if (req.originalUrl.startsWith('/api/gps') || req.originalUrl.startsWith('/api/vital') || req.originalUrl.startsWith('/api/vector')) {
         return next();
     }
 
-    // Fail safe: If no key is configured on server, block everything to prevent accidental exposure
+    // 2. API Key Check (Machine-to-Machine security)
     if (!validKey) {
-        console.error('[SECURITY] SHADOW_KEY not set in environment variables! Blocking request.');
+        console.error('[SECURITY] SHADOW_KEY not set! Blocking request.');
         return res.status(500).json({ error: "Server security misconfiguration." });
     }
 
     if (!apiKey || apiKey !== validKey) {
-        console.warn(`[SECURITY] Unauthorized access attempt from ${req.ip}`);
-        console.warn(`[DEBUG] Received Key: '${apiKey ? '***' + apiKey.slice(-3) : 'MISSING'}' | Expected Key: '${validKey ? '***' + validKey.slice(-3) : 'MISSING'}'`);
         return res.status(401).json({ error: "Unauthorized: Invalid Shadow Key" });
+    }
+
+    // 3. JWT User Session Check (For WebAuthn/Dashboard actions)
+    // Extract token from cookies (requires cookie-parser middleware in index.js)
+    const token = req.cookies?.auth_token; 
+    
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = decoded; // Attaches { id: 'admin' } to the request
+        } catch (err) {
+            console.warn('[SECURITY] Invalid JWT token provided');
+            // We don't immediately fail here; some routes might only need the API key
+        }
+    } else {
+        // Fallback for single-user system: if they have the right API key, treat as admin
+        req.user = { id: 'admin' };
     }
 
     next();
